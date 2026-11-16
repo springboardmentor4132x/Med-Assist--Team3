@@ -1,6 +1,6 @@
 """Comprehensive tests for MedAssist AI login, JWT, RBAC, logout, and error handling."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 import jwt
@@ -255,8 +255,8 @@ def test_expired_and_tampered_jwt_errors(
         "role": "patient",
         "jti": "expired-jti-123",
         "type": "access",
-        "iat": int((datetime.now(UTC) - timedelta(hours=2)).timestamp()),
-        "exp": int((datetime.now(UTC) - timedelta(hours=1)).timestamp()),
+        "iat": int((datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()),
+        "exp": int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()),
     }
     expired_token = jwt.encode(
         expired_payload, test_settings.JWT_SECRET_KEY, algorithm=test_settings.JWT_ALGORITHM

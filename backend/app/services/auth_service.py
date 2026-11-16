@@ -1,7 +1,7 @@
 """Core authentication, credential verification, token issuance, and logout services."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import status
 from sqlalchemy import delete, select
@@ -87,7 +87,7 @@ def _revoke_token_jti(
 
 def purge_expired_revoked_tokens(db: Session) -> None:
     """Remove already-expired JTIs so the blocklist does not grow unboundedly."""
-    db.execute(delete(RevokedToken).where(RevokedToken.expires_at < datetime.now(UTC)))
+    db.execute(delete(RevokedToken).where(RevokedToken.expires_at < datetime.now(timezone.utc)))
     db.commit()
 
 
@@ -193,7 +193,7 @@ def authenticate_user(
     )
 
     user = db.scalar(select(User).where(User.email == normalized_email))
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
 
     if user is None:
         record_audit_log(

@@ -1,6 +1,6 @@
 """SQLAlchemy engine and session factory supporting PostgreSQL and local SQLite."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -13,12 +13,12 @@ class Base(DeclarativeBase):
 
 
 def ensure_utc(dt: datetime | None) -> datetime | None:
-    """Normalize naive datetimes returned by SQLite into timezone-aware UTC datetimes."""
+    """Normalize naive datetimes returned by SQLite into timezone-aware timezone.utc datetimes."""
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC)
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def create_db_engine(database_url: str | None = None):

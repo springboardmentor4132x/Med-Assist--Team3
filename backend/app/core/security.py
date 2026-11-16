@@ -1,7 +1,7 @@
 """Password hashing and JWT access/refresh token utilities."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 from uuid import uuid4
 
@@ -63,7 +63,7 @@ def _build_token(
     expires_delta: timedelta,
     settings: Settings,
 ) -> tuple[str, str, datetime]:
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     expires_at = now + expires_delta
     jti = uuid4().hex
     claims = {
@@ -155,7 +155,7 @@ def decode_jwt_token(
         sub=user_id,
         jti=str(jti),
         token_type=expected_type,
-        expires_at=datetime.fromtimestamp(int(exp_raw), tz=UTC),
+        expires_at=datetime.fromtimestamp(int(exp_raw), tz=timezone.utc),
         email=payload.get("email"),
         role=payload.get("role"),
     )

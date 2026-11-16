@@ -141,6 +141,13 @@ export function DashboardPage() {
               {user.role}
             </span>
             <button
+               type="button"
+               onClick={() => navigate("/profile")}
+               className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+            >
+                My Profile
+            </button>
+            <button
               type="button"
               onClick={handleLogout}
               disabled={loggingOut}

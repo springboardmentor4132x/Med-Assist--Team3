@@ -1,7 +1,13 @@
 """Structured authentication error types and FastAPI exception handlers."""
 
-from enum import StrEnum
+from enum import Enum
 from typing import Any
+
+from fastapi import FastAPI, HTTPException, Request, status
+
+
+class StrEnum(str, Enum):
+    pass
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError

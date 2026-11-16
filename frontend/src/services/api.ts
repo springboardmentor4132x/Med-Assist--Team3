@@ -268,3 +268,27 @@ export async function callProtectedEndpoint(
   return authorizedFetch<ProtectedResourceResponse | AuditLogItem[]>(endpoint);
 }
 
+
+export interface Profile {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getMyProfileRequest(): Promise<Profile> {
+  return authorizedFetch<Profile>("/api/v1/profile/me");
+}
+
+export async function updateMyProfileRequest(
+  fullName: string
+): Promise<Profile> {
+  return authorizedFetch<Profile>("/api/v1/profile/me", {
+    method: "PUT",
+    body: JSON.stringify({ full_name: fullName }),
+  });
+}
