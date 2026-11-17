@@ -1,65 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Activity,
-  CheckCircle2,
   ClipboardList,
-  FileText,
   HeartPulse,
   LogOut,
   Stethoscope,
   User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import {
-  callProtectedEndpoint,
-  getMyAuditLogsRequest,
-} from "../services/api";
-import type { AuditLogItem, ProtectedResourceResponse } from "../types/auth";
-
-const PROTECTED_ROUTES_TO_TEST = [
-  {
-    label: "General Dashboard",
-    endpoint: "/api/v1/protected/dashboard",
-    roles: "All authenticated roles",
-  },
-  {
-    label: "Patient Profile",
-    endpoint: "/api/v1/protected/patient/profile",
-    roles: "patient, doctor, admin",
-  },
-  {
-    label: "Doctor Workspace",
-    endpoint: "/api/v1/protected/doctor/workspace",
-    roles: "doctor, clinic, admin",
-  },
-  {
-    label: "Clinic Overview",
-    endpoint: "/api/v1/protected/clinic/overview",
-    roles: "clinic, admin",
-  },
-  {
-    label: "Admin Audit Logs",
-    endpoint: "/api/v1/protected/admin/audit-logs",
-    roles: "admin only",
-  },
-];
+import { getMyAuditLogsRequest } from "../services/api";
+import type { AuditLogItem } from "../types/auth";
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [dashboardData, setDashboardData] = useState<ProtectedResourceResponse | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const loadInitialData = useCallback(async () => {
     try {
-      const [dash, logs] = await Promise.all([
-        callProtectedEndpoint("/api/v1/protected/dashboard"),
-        getMyAuditLogsRequest(),
-      ]);
-      setDashboardData(dash as ProtectedResourceResponse);
+      const logs = await getMyAuditLogsRequest();
       setAuditLogs(logs);
     } catch {
       // Handled globally if 401
@@ -171,7 +132,7 @@ export function DashboardPage() {
             </div>
             <button
               type="button"
-              onClick={() => alert("Symptom Selection & Analysis is available at /symptoms!")}
+              onClick={() => navigate("/symptoms")}
               className="mt-5 w-full rounded-xl bg-teal-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-teal-800"
             >
               Start Symptom Check
@@ -191,7 +152,7 @@ export function DashboardPage() {
             </div>
             <button
               type="button"
-              onClick={() => navigate("/profile")}
+              onClick={() => navigate(user.role === "patient" ? "/medical-history" : "/patient-history")}
               className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
             >
               View Medical Records
@@ -219,56 +180,17 @@ export function DashboardPage() {
           </div>
         </section>
 
-        {/* Role Capabilities & Activity Summary */}
-        <section className="grid gap-6 md:grid-cols-2">
-          {/* Permitted Role Capabilities */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-bold text-slate-900">Your Clinical Capabilities</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Assigned role permissions for your <span className="font-semibold capitalize text-teal-800">{user.role}</span> account.
-            </p>
-
-            <div className="mt-4 space-y-2.5">
-              {(dashboardData?.allowed_actions || []).map((action) => (
-                <div key={action} className="flex items-center gap-2.5 rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-teal-600" />
-                  <span>{action}</span>
-                </div>
-              ))}
+        {/* Clinical Safety & Advisory Notice */}
+        <section className="rounded-2xl border border-teal-100 bg-teal-50/60 p-5 text-xs text-slate-700">
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-800">
+              <Stethoscope className="h-4 w-4" />
             </div>
-          </div>
-
-          {/* Upcoming AI Modules */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-bold text-slate-900">Platform Healthcare Intelligence</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Clinical decision support modules available in MedAssist AI.
-            </p>
-
-            <div className="mt-4 space-y-2.5">
-              <div className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs">
-                <Activity className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
-                <div>
-                  <p className="font-semibold text-slate-800">Disease Prediction Engine (Module 3)</p>
-                  <p className="text-[11px] text-slate-500">Multi-class ML classification and probability scoring.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs">
-                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />
-                <div>
-                  <p className="font-semibold text-slate-800">Health Risk Assessment (Module 4)</p>
-                  <p className="text-[11px] text-slate-500">Severity evaluation and emergency red-flag identification.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs">
-                <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                <div>
-                  <p className="font-semibold text-slate-800">Treatment &amp; Advisory Guidelines (Module 5)</p>
-                  <p className="text-[11px] text-slate-500">Automated lifestyle guidance and consultation recommendations.</p>
-                </div>
-              </div>
+            <div>
+              <h3 className="font-bold text-slate-900">Clinical Triage &amp; Assessment Guidelines</h3>
+              <p className="mt-1 leading-relaxed text-slate-600">
+                MedAssist AI provides preliminary symptom screening and risk stratification. If you or someone you are assisting is experiencing severe emergency symptoms (such as acute chest pressure, sudden numbness or paralysis, severe shortness of breath, or uncontrolled bleeding), please contact emergency medical services (911 / 112) immediately.
+              </p>
             </div>
           </div>
         </section>
