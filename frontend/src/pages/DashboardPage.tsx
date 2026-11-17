@@ -17,6 +17,33 @@ import {
 } from "../services/api";
 import type { AuditLogItem, ProtectedResourceResponse } from "../types/auth";
 
+const PROTECTED_ROUTES_TO_TEST = [
+  {
+    label: "General Dashboard",
+    endpoint: "/api/v1/protected/dashboard",
+    roles: "All authenticated roles",
+  },
+  {
+    label: "Patient Profile",
+    endpoint: "/api/v1/protected/patient/profile",
+    roles: "patient, doctor, admin",
+  },
+  {
+    label: "Doctor Workspace",
+    endpoint: "/api/v1/protected/doctor/workspace",
+    roles: "doctor, clinic, admin",
+  },
+  {
+    label: "Clinic Overview",
+    endpoint: "/api/v1/protected/clinic/overview",
+    roles: "clinic, admin",
+  },
+  {
+    label: "Admin Audit Logs",
+    endpoint: "/api/v1/protected/admin/audit-logs",
+    roles: "admin only",
+  },
+];
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
@@ -144,7 +171,7 @@ export function DashboardPage() {
             </div>
             <button
               type="button"
-              onClick={() => navigate("/symptoms")}
+              onClick={() => alert("Symptom Selection & Analysis is available at /symptoms!")}
               className="mt-5 w-full rounded-xl bg-teal-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-teal-800"
             >
               Start Symptom Check
@@ -164,7 +191,7 @@ export function DashboardPage() {
             </div>
             <button
               type="button"
-              onClick={() => navigate(user.role === "patient" ? "/medical-history" : "/patient-history")}
+              onClick={() => navigate("/profile")}
               className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
             >
               View Medical Records
@@ -271,11 +298,10 @@ export function DashboardPage() {
                     </td>
                     <td className="py-2.5 pr-4">
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          log.success
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-rose-50 text-rose-700"
-                        }`}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${log.success
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-rose-50 text-rose-700"
+                          }`}
                       >
                         {log.success ? "Success" : "Blocked"}
                       </span>
@@ -294,3 +320,4 @@ export function DashboardPage() {
     </div>
   );
 }
+
