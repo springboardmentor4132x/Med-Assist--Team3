@@ -3,63 +3,26 @@ import { useNavigate } from "react-router-dom";
 import {
   Activity,
   CheckCircle2,
-  KeyRound,
+  ClipboardList,
+  FileText,
+  HeartPulse,
   LogOut,
-  RefreshCw,
-  ShieldAlert,
-  ShieldCheck,
   Stethoscope,
+  User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import {
-  ApiError,
   callProtectedEndpoint,
-  formatAuthErrorMessage,
   getMyAuditLogsRequest,
 } from "../services/api";
 import type { AuditLogItem, ProtectedResourceResponse } from "../types/auth";
 
-const PROTECTED_ROUTES_TO_TEST = [
-  {
-    label: "General Dashboard",
-    endpoint: "/api/v1/protected/dashboard",
-    roles: "All authenticated roles",
-  },
-  {
-    label: "Patient Profile",
-    endpoint: "/api/v1/protected/patient/profile",
-    roles: "patient, doctor, admin",
-  },
-  {
-    label: "Doctor Workspace",
-    endpoint: "/api/v1/protected/doctor/workspace",
-    roles: "doctor, clinic, admin",
-  },
-  {
-    label: "Clinic Overview",
-    endpoint: "/api/v1/protected/clinic/overview",
-    roles: "clinic, admin",
-  },
-  {
-    label: "Admin Audit Logs",
-    endpoint: "/api/v1/protected/admin/audit-logs",
-    roles: "admin only",
-  },
-];
-
 export function DashboardPage() {
-  const { user, logout, refreshSession } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [dashboardData, setDashboardData] = useState<ProtectedResourceResponse | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
-  const [probeResult, setProbeResult] = useState<{
-    endpoint: string;
-    status: number;
-    ok: boolean;
-    body: unknown;
-  } | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const loadInitialData = useCallback(async () => {
@@ -71,7 +34,7 @@ export function DashboardPage() {
       setDashboardData(dash as ProtectedResourceResponse);
       setAuditLogs(logs);
     } catch {
-      // Handled globally by authorizedFetch session expiry handler if 401
+      // Handled globally if 401
     }
   }, []);
 
@@ -89,46 +52,20 @@ export function DashboardPage() {
     }
   }
 
-  async function handleRotateToken() {
-    setStatusMessage(null);
-    try {
-      await refreshSession();
-      setStatusMessage("Access & refresh JWT tokens rotated successfully.");
-      await loadInitialData();
-    } catch (err) {
-      setStatusMessage(formatAuthErrorMessage(err));
-    }
-  }
-
-  async function handleProbeRoute(endpoint: string) {
-    try {
-      const data = await callProtectedEndpoint(endpoint);
-      setProbeResult({ endpoint, status: 200, ok: true, body: data });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setProbeResult({
-          endpoint,
-          status: err.status,
-          ok: false,
-          body: { error_code: err.errorCode, detail: err.message },
-        });
-      }
-    }
-  }
-
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Top Navigation */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-700 text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-700 text-white shadow-sm">
               <Stethoscope className="h-5 w-5" />
             </span>
             <div>
               <p className="text-sm font-bold text-slate-900">MedAssist AI</p>
-              <p className="text-xs text-slate-500">Authenticated Portal &amp; RBAC Gateway</p>
+              <p className="text-xs text-slate-500">Medical Symptom &amp; Disease Prediction System</p>
             </div>
           </div>
 
@@ -141,11 +78,11 @@ export function DashboardPage() {
               {user.role}
             </span>
             <button
-               type="button"
-               onClick={() => navigate("/profile")}
-               className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
             >
-                My Profile
+              My Profile
             </button>
             <button
               type="button"
@@ -161,116 +98,141 @@ export function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-        {statusMessage && (
-          <div className="flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-xs font-medium text-teal-900">
-            <CheckCircle2 className="h-4 w-4 text-teal-600" />
-            {statusMessage}
-          </div>
-        )}
+        {/* Welcome Banner */}
+        <section className="rounded-2xl border border-teal-100 bg-gradient-to-r from-teal-900 to-cyan-900 p-6 text-white shadow-sm sm:p-8">
+          <span className="rounded-full bg-teal-400/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-teal-200">
+            {user.role.toUpperCase()} PORTAL
+          </span>
+          <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
+            Welcome back, {user.full_name}
+          </h1>
+          <p className="mt-2 max-w-2xl text-xs text-teal-100/90 sm:text-sm">
+            Access AI-driven symptom analysis, disease prediction insights, and clinical healthcare workflows.
+          </p>
+        </section>
 
-        {/* Session Summary + Capabilities */}
-        <section className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h1 className="flex items-center gap-2 text-base font-bold text-slate-900">
-                <ShieldCheck className="h-5 w-5 text-teal-700" />
-                Verified JWT Session
-              </h1>
-              <button
-                type="button"
-                onClick={handleRotateToken}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Rotate Token
-              </button>
+        {/* Primary Healthcare Clinical Actions */}
+        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Action 1: Symptom Analysis (Module 2) */}
+          <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal-500 hover:shadow-md">
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                <HeartPulse className="h-6 w-6" />
+              </div>
+              <h2 className="mt-4 text-base font-bold text-slate-900">Symptom Checker</h2>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                Input current symptoms, validate clinical terms, and calculate co-occurrence correlations across 130+ disease profiles.
+              </p>
             </div>
-
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-slate-500">Account Role</dt>
-                <dd className="mt-0.5 font-semibold capitalize text-slate-900">{user.role}</dd>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-slate-500">Account Status</dt>
-                <dd className="mt-0.5 font-semibold text-emerald-700">
-                  {user.is_active ? "Active" : "Inactive"}
-                </dd>
-              </div>
-              <div className="col-span-2 rounded-xl bg-slate-50 p-3">
-                <dt className="text-slate-500">Permitted Role Actions</dt>
-                <dd className="mt-1.5 space-y-1 text-slate-700">
-                  {(dashboardData?.allowed_actions || []).map((action) => (
-                    <div key={action} className="flex items-center gap-1.5">
-                      <Activity className="h-3.5 w-3.5 text-teal-600" />
-                      <span>{action}</span>
-                    </div>
-                  ))}
-                </dd>
-              </div>
-            </dl>
+            <button
+              type="button"
+              onClick={() => alert("Symptom Selection & Analysis is available at /symptoms!")}
+              className="mt-5 w-full rounded-xl bg-teal-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-teal-800"
+            >
+              Start Symptom Check
+            </button>
           </div>
 
-          {/* Protected RBAC Route Verification */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
-              <KeyRound className="h-5 w-5 text-teal-700" />
-              Protected API &amp; RBAC Verifier
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Test role-based access enforcement across MedAssist AI protected routes.
-            </p>
-
-            <div className="mt-4 space-y-2">
-              {PROTECTED_ROUTES_TO_TEST.map((item) => (
-                <button
-                  key={item.endpoint}
-                  type="button"
-                  onClick={() => handleProbeRoute(item.endpoint)}
-                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3.5 py-2 text-left text-xs transition hover:border-teal-400 hover:bg-teal-50/40"
-                >
-                  <div>
-                    <p className="font-semibold text-slate-800">{item.label}</p>
-                    <p className="font-mono text-[11px] text-slate-400">{item.endpoint}</p>
-                  </div>
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                    {item.roles}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {probeResult && (
-              <div
-                className={`mt-4 rounded-xl border p-3 text-xs ${
-                  probeResult.ok
-                    ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
-                    : "border-rose-200 bg-rose-50/70 text-rose-950"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-semibold">
-                  {probeResult.ok ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  ) : (
-                    <ShieldAlert className="h-4 w-4 text-rose-600" />
-                  )}
-                  <span>
-                    HTTP {probeResult.status} — {probeResult.endpoint}
-                  </span>
-                </div>
-                <pre className="mt-2 max-h-36 overflow-auto rounded-lg bg-white/80 p-2 font-mono text-[11px] text-slate-800">
-                  {JSON.stringify(probeResult.body, null, 2)}
-                </pre>
+          {/* Action 2: Medical History (Module 1) */}
+          <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal-500 hover:shadow-md">
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700">
+                <ClipboardList className="h-6 w-6" />
               </div>
-            )}
+              <h2 className="mt-4 text-base font-bold text-slate-900">Medical History</h2>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                View and manage chronic health conditions, active medications, known allergies, and previous clinical records.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+            >
+              View Medical Records
+            </button>
+          </div>
+
+          {/* Action 3: Profile Management (Module 1) */}
+          <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal-500 hover:shadow-md">
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <UserIcon className="h-6 w-6" />
+              </div>
+              <h2 className="mt-4 text-base font-bold text-slate-900">Profile &amp; Settings</h2>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                Review your registered account details, assigned healthcare role, and personal demographic information.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+            >
+              Manage Profile
+            </button>
           </div>
         </section>
 
-        {/* Recent Auth Audit Logs */}
+        {/* Role Capabilities & Activity Summary */}
+        <section className="grid gap-6 md:grid-cols-2">
+          {/* Permitted Role Capabilities */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-bold text-slate-900">Your Clinical Capabilities</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Assigned role permissions for your <span className="font-semibold capitalize text-teal-800">{user.role}</span> account.
+            </p>
+
+            <div className="mt-4 space-y-2.5">
+              {(dashboardData?.allowed_actions || []).map((action) => (
+                <div key={action} className="flex items-center gap-2.5 rounded-xl bg-slate-50 p-3 text-xs text-slate-700">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-teal-600" />
+                  <span>{action}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Upcoming AI Modules */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-bold text-slate-900">Platform Healthcare Intelligence</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Clinical decision support modules available in MedAssist AI.
+            </p>
+
+            <div className="mt-4 space-y-2.5">
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs">
+                <Activity className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
+                <div>
+                  <p className="font-semibold text-slate-800">Disease Prediction Engine (Module 3)</p>
+                  <p className="text-[11px] text-slate-500">Multi-class ML classification and probability scoring.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs">
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />
+                <div>
+                  <p className="font-semibold text-slate-800">Health Risk Assessment (Module 4)</p>
+                  <p className="text-[11px] text-slate-500">Severity evaluation and emergency red-flag identification.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs">
+                <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <div>
+                  <p className="font-semibold text-slate-800">Treatment &amp; Advisory Guidelines (Module 5)</p>
+                  <p className="text-[11px] text-slate-500">Automated lifestyle guidance and consultation recommendations.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Security & Audit Activity */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-base font-bold text-slate-900">Your Authentication Activity</h2>
+          <h2 className="text-base font-bold text-slate-900">Recent Account Activity</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Security audit trail recorded by the MedAssist AI authentication gateway.
+            Security audit log for your current session.
           </p>
 
           <div className="mt-4 overflow-x-auto">
@@ -278,18 +240,18 @@ export function DashboardPage() {
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
                   <th className="py-2 pr-4 font-semibold">Event</th>
-                  <th className="py-2 pr-4 font-semibold">Outcome</th>
-                  <th className="py-2 pr-4 font-semibold">Detail</th>
+                  <th className="py-2 pr-4 font-semibold">Status</th>
+                  <th className="py-2 pr-4 font-semibold">Description</th>
                   <th className="py-2 font-semibold">Timestamp</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {auditLogs.map((log) => (
+                {auditLogs.slice(0, 5).map((log) => (
                   <tr key={log.id}>
-                    <td className="py-2 pr-4 font-mono font-medium text-slate-800">
+                    <td className="py-2.5 pr-4 font-mono font-medium text-slate-800">
                       {log.event_type}
                     </td>
-                    <td className="py-2 pr-4">
+                    <td className="py-2.5 pr-4">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                           log.success
@@ -300,8 +262,8 @@ export function DashboardPage() {
                         {log.success ? "Success" : "Blocked"}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-slate-600">{log.detail}</td>
-                    <td className="py-2 text-slate-400">
+                    <td className="py-2.5 pr-4 text-slate-600">{log.detail}</td>
+                    <td className="py-2.5 text-slate-400">
                       {new Date(log.created_at).toLocaleString()}
                     </td>
                   </tr>
@@ -314,4 +276,3 @@ export function DashboardPage() {
     </div>
   );
 }
-
