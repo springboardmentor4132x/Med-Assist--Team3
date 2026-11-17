@@ -17,6 +17,7 @@ import {
 } from "../services/api";
 import type { AuditLogItem, ProtectedResourceResponse } from "../types/auth";
 
+
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -77,6 +78,23 @@ export function DashboardPage() {
             <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold capitalize text-teal-800">
               {user.role}
             </span>
+            {user.role === "patient" ? (
+              <button
+                type="button"
+                onClick={() => navigate("/medical-history")}
+                className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              >
+                Medical History
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate("/patient-history")}
+                className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              >
+                Patient Records
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigate("/profile")}
@@ -126,7 +144,7 @@ export function DashboardPage() {
             </div>
             <button
               type="button"
-              onClick={() => alert("Symptom Selection & Analysis is available at /symptoms!")}
+              onClick={() => navigate("/symptoms")}
               className="mt-5 w-full rounded-xl bg-teal-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-teal-800"
             >
               Start Symptom Check
@@ -146,7 +164,7 @@ export function DashboardPage() {
             </div>
             <button
               type="button"
-              onClick={() => navigate("/profile")}
+              onClick={() => navigate(user.role === "patient" ? "/medical-history" : "/patient-history")}
               className="mt-5 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
             >
               View Medical Records

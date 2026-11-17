@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,6 +15,7 @@ import {
   Stethoscope,
   Building2,
   UserCog,
+  FileHeart,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -416,6 +416,32 @@ export function ProfilePage() {
             permissions.
           </p>
         </section>
+
+        {role === "patient" && (
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-teal-50 p-3">
+                <FileHeart className="h-6 w-6 text-teal-700" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">
+                  Patient Medical History
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Manage your chronic conditions, allergies, medications, and lifestyle factors.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate("/medical-history")}
+              className="rounded-xl bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+            >
+              Manage Medical History
+            </button>
+          </section>
+        )}
       </main>
     </div>
   );
