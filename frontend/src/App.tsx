@@ -3,8 +3,11 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
-import { RegisterPage } from "./pages/RegisterPage";
+import { MedicalHistoryPage } from "./pages/MedicalHistoryPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { PatientMedicalHistoryViewPage } from "./pages/PatientMedicalHistoryViewPage";
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -15,6 +18,22 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/medical-history"
+        element={
+          <ProtectedRoute>
+            <MedicalHistoryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/patient-history"
+        element={
+          <ProtectedRoute>
+            <PatientMedicalHistoryViewPage />
           </ProtectedRoute>
         }
       />

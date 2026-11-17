@@ -31,6 +31,11 @@ const PROTECTED_ROUTES_TO_TEST = [
     roles: "patient, doctor, admin",
   },
   {
+    label: "Patient Medical History",
+    endpoint: "/api/v1/medical-history/me",
+    roles: "patient only",
+  },
+  {
     label: "Doctor Workspace",
     endpoint: "/api/v1/protected/doctor/workspace",
     roles: "doctor, clinic, admin",
@@ -140,12 +145,29 @@ export function DashboardPage() {
             <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold capitalize text-teal-800">
               {user.role}
             </span>
+            {user.role === "patient" ? (
+              <button
+                type="button"
+                onClick={() => navigate("/medical-history")}
+                className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              >
+                Medical History
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate("/patient-history")}
+                className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              >
+                Patient Records
+              </button>
+            )}
             <button
-               type="button"
-               onClick={() => navigate("/profile")}
-               className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
             >
-                My Profile
+              My Profile
             </button>
             <button
               type="button"
@@ -314,4 +336,3 @@ export function DashboardPage() {
     </div>
   );
 }
-
