@@ -5,6 +5,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { SymptomSelectionPage } from "./pages/SymptomSelectionPage";
 export function AppRoutes() {
   return (
     <Routes>
@@ -23,6 +24,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/symptoms"
+        element={
+          <ProtectedRoute>
+            <SymptomSelectionPage />
           </ProtectedRoute>
         }
       />

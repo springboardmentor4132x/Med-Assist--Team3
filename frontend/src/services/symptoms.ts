@@ -6,6 +6,21 @@ import type {
   SymptomValidationResponse,
 } from "../types/symptoms";
 
+import { authorizedFetch } from "./api";
+
+export interface SymptomSubmissionResponse {
+  message: string;
+  submission_id: number;
+  user_id: number;
+  symptoms: SymptomInputItem[];
+  warnings: Array<{
+    code: string;
+    message: string;
+    symptom_id?: string | null;
+  }>;
+  created_at: string;
+}
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
 export async function fetchSymptomsCatalog(params?: {
@@ -63,4 +78,18 @@ export async function analyzeSymptoms(
     throw new Error(errorData.detail || `Analysis failed (${response.status})`);
   }
   return response.json();
+}
+export async function submitSelectedSymptoms(
+  symptoms: SymptomInputItem[]
+): Promise<SymptomSubmissionResponse> {
+  return authorizedFetch<SymptomSubmissionResponse>(
+    "/api/v1/symptoms/submit",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ symptoms }),
+    }
+  );
 }

@@ -5,6 +5,16 @@ from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.data.symptoms_dataset import SYMPTOM_CATALOG
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, get_db
+from app.models import SymptomSubmission, User
+
 from app.schemas.symptoms import (
     SymptomAnalysisRequest,
     SymptomAnalysisResponse,
@@ -39,7 +49,10 @@ def get_symptoms_catalog(
         if is_red_flag is not None and meta.is_red_flag != is_red_flag:
             continue
         if norm_search:
-            name_match = norm_search in meta.name.lower() or norm_search in meta.id.lower()
+            name_match = (
+                  norm_search in meta.name.lower()
+                  or norm_search in meta.id.lower()
+                )
             alias_match = any(norm_search in alias.lower() for alias in meta.aliases)
             if not (name_match or alias_match):
                 continue
@@ -140,3 +153,46 @@ def analyze_symptoms(payload: SymptomAnalysisRequest) -> SymptomAnalysisResponse
         primary_affected_systems=primary_systems,
         potential_disease_categories=potential_categories,
     )
+
+@router.post("/submit", status_code=status.HTTP_201_CREATED)
+def submit_symptoms(
+    payload: SymptomAnalysisRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Validate and save symptoms for the logged-in user."""
+
+    is_valid, validated_symptoms, warnings, errors = validate_symptoms_input(
+        payload.symptoms
+    )
+
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[error.model_dump() for error in errors],
+        )
+
+    symptoms_data = [
+        symptom.model_dump(mode="json")
+        for symptom in validated_symptoms
+    ]
+
+    submission = SymptomSubmission(
+        user_id=current_user.id,
+        symptoms=symptoms_data,
+    )
+
+    db.add(submission)
+    db.commit()
+    db.refresh(submission)
+
+    return {
+        "message": "Symptoms submitted successfully.",
+        "submission_id": submission.id,
+        "user_id": submission.user_id,
+        "symptoms": symptoms_data,
+        "warnings": [
+            warning.model_dump(mode="json") for warning in warnings
+        ],
+        "created_at": submission.created_at,
+    }

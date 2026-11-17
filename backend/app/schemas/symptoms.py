@@ -1,6 +1,6 @@
 """Pydantic schemas for Module 2: Symptom Validation and Correlation Analysis."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
@@ -94,7 +94,7 @@ class SymptomAnalysisResponse(BaseModel):
     """Comprehensive correlation and cluster analysis output for Module 2."""
 
     session_id: str = Field(default_factory=lambda: uuid4().hex)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     validated_symptoms: list[ValidatedSymptom]
     has_red_flags: bool
     red_flag_symptoms: list[str]
