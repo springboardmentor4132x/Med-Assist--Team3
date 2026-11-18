@@ -7,7 +7,6 @@ import {
   HeartPulse,
   ShieldCheck,
   Stethoscope,
-  User as UserIcon,
 } from "lucide-react";
 import { AppNavbar } from "../components/AppNavbar";
 import { useAuth } from "../context/AuthContext";
@@ -100,7 +99,7 @@ export function DashboardPage() {
         </section>
 
         {/* Primary Healthcare Clinical Actions */}
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="grid gap-5 md:grid-cols-2">
           {/* Action 1: Symptom Analysis */}
           <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal-500 hover:shadow-md">
             <div>
@@ -143,27 +142,6 @@ export function DashboardPage() {
               className="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50/50 hover:text-teal-800"
             >
               {isPatient ? "Manage Medical History" : "Lookup Patient Records"}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Action 3: Profile Management */}
-          <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-teal-500 hover:shadow-md">
-            <div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                <UserIcon className="h-6 w-6" />
-              </div>
-              <h2 className="mt-4 text-base font-bold text-slate-900">Profile &amp; Settings</h2>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-                Review your registered account details, update your display name, and view your clinical portal role.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate("/profile")}
-              className="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50/50 hover:text-teal-800"
-            >
-              Manage Profile
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
