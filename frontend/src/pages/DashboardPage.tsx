@@ -14,22 +14,26 @@ import { useAuth } from "../context/AuthContext";
 import { getMyAuditLogsRequest } from "../services/api";
 import type { AuditLogItem } from "../types/auth";
 
-const EVENT_LABELS: Record<string, string> = {
-  LOGIN_SUCCESS: "Signed In",
-  LOGIN_FAILED: "Failed Sign-In Attempt",
-  LOGIN_LOCKED: "Account Temporarily Locked",
-  REGISTER_SUCCESS: "Account Created",
-  LOGOUT: "Signed Out",
-  TOKEN_REFRESH: "Session Refreshed",
-  PROFILE_UPDATED: "Profile Updated",
+const EVENT_DISPLAY: Record<string, { label: string; summary: string }> = {
+  login_success: { label: "Signed In", summary: "Signed in to MedAssist AI portal." },
+  login_failed: { label: "Failed Sign-In", summary: "Invalid credentials attempt blocked." },
+  login_locked: { label: "Account Locked", summary: "Temporary security lockout triggered." },
+  register_success: { label: "Account Created", summary: "New MedAssist AI account registered." },
+  logout: { label: "Signed Out", summary: "Signed out of active session securely." },
+  token_refresh: { label: "Session Renewed", summary: "Active session extended securely." },
+  profile_updated: { label: "Profile Updated", summary: "Account profile details updated." },
 };
 
-function formatEventLabel(eventType: string): string {
-  if (EVENT_LABELS[eventType]) return EVENT_LABELS[eventType];
-  return eventType
-    .toLowerCase()
+function formatAuditEvent(log: AuditLogItem): { label: string; summary: string } {
+  const key = log.event_type.toLowerCase();
+  if (EVENT_DISPLAY[key]) {
+    return EVENT_DISPLAY[key];
+  }
+  const label = key
     .replace(/_/g, " ")
     .replace(/\b\w/g, (ch) => ch.toUpperCase());
+  const cleanDetail = log.detail.replace(/\s*\(\d+\s+token\(s\)\s+revoked\)/i, "");
+  return { label, summary: cleanDetail };
 }
 
 export function DashboardPage() {
@@ -37,9 +41,13 @@ export function DashboardPage() {
   const navigate = useNavigate();
 
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
-  const [loadingLogs, setLoadingLogs] = useState(true);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
-  const loadInitialData = useCallback(async () => {
+  const isPatient = user?.role === "patient";
+  const isAdmin = user?.role === "admin";
+
+  const loadAdminAuditLogs = useCallback(async () => {
+    if (!isAdmin) return;
     try {
       setLoadingLogs(true);
       const logs = await getMyAuditLogsRequest();
@@ -49,15 +57,13 @@ export function DashboardPage() {
     } finally {
       setLoadingLogs(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
-    void loadInitialData();
-  }, [loadInitialData]);
+    void loadAdminAuditLogs();
+  }, [loadAdminAuditLogs]);
 
   if (!user) return null;
-
-  const isPatient = user.role === "patient";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -178,65 +184,70 @@ export function DashboardPage() {
           </div>
         </section>
 
-        {/* Recent Account Activity */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Recent Account Activity</h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Recent sign-ins and security events for your account.
-              </p>
+        {/* Admin-only Security Audit Overview */}
+        {isAdmin && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Admin Security Activity</h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Recent administrative sign-ins and security events.
+                </p>
+              </div>
+              <Clock className="h-4 w-4 text-slate-400" />
             </div>
-            <Clock className="h-4 w-4 text-slate-400" />
-          </div>
 
-          {loadingLogs ? (
-            <div className="mt-5 py-6 text-center text-xs text-slate-400">
-              Loading recent activity…
-            </div>
-          ) : auditLogs.length === 0 ? (
-            <div className="mt-5 rounded-xl bg-slate-50 py-6 text-center text-xs text-slate-500">
-              No recent account activity recorded yet.
-            </div>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="py-2 pr-4 font-semibold">Activity</th>
-                    <th className="py-2 pr-4 font-semibold">Status</th>
-                    <th className="py-2 pr-4 font-semibold">Details</th>
-                    <th className="py-2 font-semibold">Date &amp; Time</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {auditLogs.slice(0, 5).map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 pr-4 font-medium text-slate-800">
-                        {formatEventLabel(log.event_type)}
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                            log.success
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-rose-50 text-rose-700"
-                          }`}
-                        >
-                          {log.success ? "Verified" : "Blocked"}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-4 text-slate-600">{log.detail}</td>
-                      <td className="whitespace-nowrap py-2.5 text-slate-400">
-                        {new Date(log.created_at).toLocaleString()}
-                      </td>
+            {loadingLogs ? (
+              <div className="mt-5 py-6 text-center text-xs text-slate-400">
+                Loading security activity…
+              </div>
+            ) : auditLogs.length === 0 ? (
+              <div className="mt-5 rounded-xl bg-slate-50 py-6 text-center text-xs text-slate-500">
+                No recent security events recorded.
+              </div>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500">
+                      <th className="py-2 pr-4 font-semibold">Activity</th>
+                      <th className="py-2 pr-4 font-semibold">Status</th>
+                      <th className="py-2 pr-4 font-semibold">Details</th>
+                      <th className="py-2 font-semibold">Date &amp; Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {auditLogs.slice(0, 5).map((log) => {
+                      const formatted = formatAuditEvent(log);
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/70">
+                          <td className="py-2.5 pr-4 font-medium text-slate-800">
+                            {formatted.label}
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                                log.success
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-rose-50 text-rose-700"
+                              }`}
+                            >
+                              {log.success ? "Verified" : "Blocked"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pr-4 text-slate-600">{formatted.summary}</td>
+                          <td className="whitespace-nowrap py-2.5 text-slate-400">
+                            {new Date(log.created_at).toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
       </main>
     </div>
   );

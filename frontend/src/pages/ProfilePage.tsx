@@ -21,10 +21,31 @@ import { AppNavbar } from "../components/AppNavbar";
 import { useAuth } from "../context/AuthContext";
 import {
   ApiError,
+  getMyAuditLogsRequest,
   getMyProfileRequest,
   updateMyProfileRequest,
   type Profile,
 } from "../services/api";
+import type { AuditLogItem } from "../types/auth";
+
+const SECURITY_EVENT_DISPLAY: Record<string, { label: string; summary: string }> = {
+  login_success: { label: "Signed In", summary: "Signed in to MedAssist AI." },
+  login_failed: { label: "Failed Sign-In", summary: "Invalid sign-in attempt blocked." },
+  login_locked: { label: "Account Locked", summary: "Temporary security lockout triggered." },
+  register_success: { label: "Account Created", summary: "Account registered successfully." },
+  logout: { label: "Signed Out", summary: "Signed out of your session securely." },
+  token_refresh: { label: "Session Renewed", summary: "Active session extended securely." },
+  profile_updated: { label: "Profile Updated", summary: "Profile information updated." },
+};
+
+function formatSecurityEvent(log: AuditLogItem): { label: string; summary: string } {
+  const key = log.event_type.toLowerCase();
+  if (SECURITY_EVENT_DISPLAY[key]) return SECURITY_EVENT_DISPLAY[key];
+  return {
+    label: key.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()),
+    summary: log.detail.replace(/\s*\(\d+\s+token\(s\)\s+revoked\)/i, ""),
+  };
+}
 
 const roleDetails: Record<
   string,
@@ -57,6 +78,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [recentActivity, setRecentActivity] = useState<AuditLogItem[]>([]);
   const [fullName, setFullName] = useState("");
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -72,11 +94,15 @@ export function ProfilePage() {
         setLoading(true);
         setError("");
 
-        const data = await getMyProfileRequest();
+        const [data, logs] = await Promise.all([
+          getMyProfileRequest(),
+          getMyAuditLogsRequest().catch(() => [] as AuditLogItem[]),
+        ]);
 
         if (active) {
           setProfile(data);
           setFullName(data.full_name);
+          setRecentActivity(logs);
         }
       } catch (err) {
         if (active) {
@@ -421,6 +447,66 @@ export function ProfilePage() {
             </button>
           </section>
         )}
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h3 className="font-bold text-slate-900">Recent Sign-In Activity</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Recent security and sign-in history for your account.
+              </p>
+            </div>
+            <Clock className="h-4 w-4 text-slate-400" />
+          </div>
+
+          {recentActivity.length === 0 ? (
+            <p className="mt-4 rounded-xl bg-slate-50 py-5 text-center text-xs text-slate-500">
+              No recent sign-in activity recorded yet.
+            </p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="py-2 pr-4 font-semibold">Activity</th>
+                    <th className="py-2 pr-4 font-semibold">Status</th>
+                    <th className="py-2 pr-4 font-semibold">Details</th>
+                    <th className="py-2 font-semibold">Date &amp; Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentActivity.slice(0, 5).map((log) => {
+                    const formatted = formatSecurityEvent(log);
+                    return (
+                      <tr key={log.id} className="hover:bg-slate-50/70">
+                        <td className="py-2.5 pr-4 font-medium text-slate-800">
+                          {formatted.label}
+                        </td>
+                        <td className="py-2.5 pr-4">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                              log.success
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-rose-50 text-rose-700"
+                            }`}
+                          >
+                            {log.success ? "Verified" : "Blocked"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-slate-600">
+                          {formatted.summary}
+                        </td>
+                        <td className="whitespace-nowrap py-2.5 text-slate-400">
+                          {new Date(log.created_at).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );
