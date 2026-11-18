@@ -13,7 +13,17 @@ from app.schemas.symptoms import (
     ValidatedSymptom,
     ValidationIssue,
 )
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
+from app.models.symptom_submission import SymptomSubmission
+from app.models.user import User, UserRole
+from app.schemas.symptoms import (
+    IntegratedSymptomAssessmentResponse,
+    MedicalHistoryContext,
+)
+from app.services.medical_history_service import get_or_initialize_history
 
 def _clean_string(text: str) -> str:
     """Normalize string for lookup: lowercase, replace spaces/hyphens with single underscore."""
@@ -276,3 +286,138 @@ def compute_symptom_correlations(
         primary_systems,
         distinct_categories[:3],
     )
+
+def build_medical_history_context(db: Session, user_id: int) -> MedicalHistoryContext:
+    """Retrieve baseline medical history and prior assessment count for a user."""
+    history = get_or_initialize_history(db, user_id)
+
+    prior_count_stmt = select(func.count(SymptomSubmission.id)).where(
+        SymptomSubmission.user_id == user_id
+    )
+    previous_count = db.execute(prior_count_stmt).scalar_one()
+
+    return MedicalHistoryContext(
+        medical_history_id=history.id,
+        blood_group=history.blood_group,
+        chronic_conditions=history.chronic_conditions or [],
+        allergies=history.allergies or [],
+        current_medications=history.current_medications or [],
+        past_surgeries=history.past_surgeries or [],
+        family_history=history.family_history or [],
+        lifestyle_factors=history.lifestyle_factors or {},
+        previous_assessments_count=previous_count,
+        history_last_updated_at=history.updated_at,
+    )
+
+
+def create_integrated_symptom_assessment(
+    db: Session,
+    user_id: int,
+    raw_items: list[SymptomItem],
+) -> IntegratedSymptomAssessmentResponse:
+    """Validate symptoms, run correlation analysis, integrate medical history, and persist."""
+    is_valid, validated, warnings, errors = validate_symptoms_input(raw_items)
+    if not is_valid or not validated:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[error.model_dump() for error in errors],
+        )
+
+    (
+        correlated_pairs,
+        suggested_co_occurring,
+        cluster_coherence,
+        primary_systems,
+        potential_categories,
+    ) = compute_symptom_correlations(validated)
+
+    red_flags = [s.name for s in validated if s.is_red_flag]
+    history_context = build_medical_history_context(db, user_id)
+
+    symptoms_payload = [s.model_dump(mode="json") for s in validated]
+    correlation_payload = {
+        "has_red_flags": len(red_flags) > 0,
+        "red_flag_symptoms": red_flags,
+        "cluster_coherence": cluster_coherence,
+        "top_correlated_pairs": [p.model_dump(mode="json") for p in correlated_pairs],
+        "suggested_co_occurring_symptoms": [
+            s.model_dump(mode="json") for s in suggested_co_occurring
+        ],
+        "primary_affected_systems": primary_systems,
+        "potential_disease_categories": potential_categories,
+        "warnings": [w.model_dump(mode="json") for w in warnings],
+    }
+    history_context_payload = history_context.model_dump(mode="json")
+
+    submission = SymptomSubmission(
+        user_id=user_id,
+        medical_history_id=history_context.medical_history_id,
+        symptoms=symptoms_payload,
+        correlation_summary=correlation_payload,
+        medical_history_context=history_context_payload,
+    )
+    db.add(submission)
+    db.commit()
+    db.refresh(submission)
+
+    return _serialize_submission_to_assessment(submission)
+
+
+def _serialize_submission_to_assessment(
+    submission: SymptomSubmission,
+) -> IntegratedSymptomAssessmentResponse:
+    """Convert a persisted SymptomSubmission row into an IntegratedSymptomAssessmentResponse."""
+    corr = submission.correlation_summary or {}
+    hist = submission.medical_history_context or {}
+
+    return IntegratedSymptomAssessmentResponse(
+        assessment_id=submission.id,
+        user_id=submission.user_id,
+        created_at=submission.created_at,
+        validated_symptoms=[ValidatedSymptom(**s) for s in submission.symptoms],
+        warnings=[ValidationIssue(**w) for w in corr.get("warnings", [])],
+        has_red_flags=corr.get("has_red_flags", False),
+        red_flag_symptoms=corr.get("red_flag_symptoms", []),
+        cluster_coherence=corr.get("cluster_coherence", "low"),
+        top_correlated_pairs=[
+            SymptomCorrelationItem(**p) for p in corr.get("top_correlated_pairs", [])
+        ],
+        suggested_co_occurring_symptoms=[
+            SuggestedSymptom(**s)
+            for s in corr.get("suggested_co_occurring_symptoms", [])
+        ],
+        primary_affected_systems=corr.get("primary_affected_systems", []),
+        potential_disease_categories=corr.get("potential_disease_categories", []),
+        medical_history_context=MedicalHistoryContext(**hist),
+    )
+
+
+def get_user_symptom_assessments(
+    db: Session,
+    user_id: int,
+    limit: int = 20,
+) -> list[IntegratedSymptomAssessmentResponse]:
+    """Fetch past integrated assessments for a specific user ordered newest first."""
+    stmt = (
+        select(SymptomSubmission)
+        .where(SymptomSubmission.user_id == user_id)
+        .order_by(SymptomSubmission.created_at.desc())
+        .limit(limit)
+    )
+    records = db.execute(stmt).scalars().all()
+    return [_serialize_submission_to_assessment(r) for r in records]
+
+
+def get_patient_assessments_for_provider(
+    db: Session,
+    patient_id: int,
+    limit: int = 20,
+) -> list[IntegratedSymptomAssessmentResponse]:
+    """Allow doctors, clinics, and admins to inspect a patient's integrated assessments."""
+    patient = db.get(User, patient_id)
+    if patient is None or patient.role != UserRole.PATIENT.value:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient record not found.",
+        )
+    return get_user_symptom_assessments(db, patient_id, limit=limit)

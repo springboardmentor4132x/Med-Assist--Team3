@@ -1,9 +1,9 @@
 """Pydantic schemas for Module 2: Symptom Validation and Correlation Analysis."""
 
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, Any
 from uuid import uuid4
-
+from app.schemas.medical_history import LifestyleFactors, MedicationItem, SurgeryItem
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SymptomSeverity = Literal["mild", "moderate", "severe"]
@@ -123,3 +123,37 @@ class SymptomCategorySummary(BaseModel):
     category: str
     symptom_count: int
     sample_symptoms: list[str]
+    
+class MedicalHistoryContext(BaseModel):
+    """Point-in-time baseline medical history and longitudinal context for Module 2 & 3."""
+
+    medical_history_id: int
+    blood_group: str | None = None
+    chronic_conditions: list[str] = Field(default_factory=list)
+    allergies: list[str] = Field(default_factory=list)
+    current_medications: list[MedicationItem] = Field(default_factory=list)
+    past_surgeries: list[SurgeryItem] = Field(default_factory=list)
+    family_history: list[str] = Field(default_factory=list)
+    lifestyle_factors: LifestyleFactors = Field(default_factory=LifestyleFactors)
+    previous_assessments_count: int = 0
+    history_last_updated_at: datetime | None = None
+
+
+class IntegratedSymptomAssessmentResponse(BaseModel):
+    """Complete Module 2 output combining validated symptoms, correlations, and medical history."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    assessment_id: int
+    user_id: int
+    created_at: datetime
+    validated_symptoms: list[ValidatedSymptom]
+    warnings: list[ValidationIssue] = Field(default_factory=list)
+    has_red_flags: bool
+    red_flag_symptoms: list[str]
+    cluster_coherence: ClusterCoherence
+    top_correlated_pairs: list[SymptomCorrelationItem]
+    suggested_co_occurring_symptoms: list[SuggestedSymptom]
+    primary_affected_systems: list[str]
+    potential_disease_categories: list[str]
+    medical_history_context: MedicalHistoryContext

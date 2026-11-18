@@ -1,12 +1,13 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
+  fetchMySymptomAssessments,
   fetchSymptomsCatalog,
   submitSelectedSymptoms,
 } from "../services/symptoms";
 import type {
+  IntegratedSymptomAssessmentResponse,
   SymptomCatalogItem,
   SymptomInputItem,
 } from "../types/symptoms";
@@ -22,6 +23,13 @@ export function SymptomSelectionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [assessment, setAssessment] =
+    useState<IntegratedSymptomAssessmentResponse | null>(null);
+
+  const [historyList, setHistoryList] = useState<
+    IntegratedSymptomAssessmentResponse[]
+  >([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -38,7 +46,20 @@ export function SymptomSelectionPage() {
       }
     }
 
+    async function loadHistory() {
+      try {
+        setLoadingHistory(true);
+        const data = await fetchMySymptomAssessments();
+        setHistoryList(data);
+      } catch {
+        // Ignore if user has no history yet or endpoint isn't reachable
+      } finally {
+        setLoadingHistory(false);
+      }
+    }
+
     loadCatalog();
+    loadHistory();
   }, []);
 
   const categories = useMemo(
@@ -125,8 +146,10 @@ export function SymptomSelectionPage() {
 
       const response = await submitSelectedSymptoms(selected);
 
+      setAssessment(response);
+      setHistoryList((previous) => [response, ...previous]);
       setSuccess(
-        `${response.message} Submission ID: ${response.submission_id}`
+        `Assessment #${response.assessment_id} completed and integrated with your medical history.`
       );
       setSelected([]);
     } catch (err) {
@@ -159,6 +182,12 @@ export function SymptomSelectionPage() {
               {user?.full_name}
             </span>
             <Link
+              to="/medical-history"
+              className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-800 hover:bg-teal-100"
+            >
+              Medical History
+            </Link>
+            <Link
               to="/dashboard"
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-white"
             >
@@ -177,6 +206,168 @@ export function SymptomSelectionPage() {
           <div role="status" className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
             {success}
           </div>
+        )}
+
+        {assessment && (
+          <section className="mb-8 rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wide text-teal-700">
+                  Integrated Assessment #{assessment.assessment_id}
+                </span>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">
+                  Symptom Analysis &amp; Medical History Context
+                </h2>
+              </div>
+              <Link
+                to="/medical-history"
+                className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
+              >
+                Update Medical History
+              </Link>
+            </div>
+
+            {assessment.has_red_flags && (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+                <strong>Urgent Red-Flag Symptoms Detected:</strong>{" "}
+                {assessment.red_flag_symptoms.join(", ")}. Please seek prompt medical evaluation.
+              </div>
+            )}
+
+            {assessment.warnings.length > 0 && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+                <p className="font-semibold">Clinical Validation Notes:</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  {assessment.warnings.map((w, idx) => (
+                    <li key={idx}>{w.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-6 md:grid-cols-2">
+              {/* Current Symptom Correlation Summary */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Current Symptom Correlation Summary
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Cluster Coherence:{" "}
+                  <span className="font-semibold capitalize text-slate-800">
+                    {assessment.cluster_coherence}
+                  </span>{" "}
+                  • Affected Systems:{" "}
+                  <span className="font-semibold capitalize text-slate-800">
+                    {assessment.primary_affected_systems.join(", ").replace(/_/g, " ") || "General"}
+                  </span>
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {assessment.validated_symptoms.map((sym) => (
+                    <span
+                      key={sym.symptom_id}
+                      className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-800"
+                    >
+                      {sym.name} ({sym.severity}, {sym.duration_days}d)
+                    </span>
+                  ))}
+                </div>
+
+                {assessment.top_correlated_pairs.length > 0 && (
+                  <div className="mt-3 space-y-1.5 text-xs">
+                    <p className="font-semibold text-slate-700">Top Correlated Pairs:</p>
+                    {assessment.top_correlated_pairs.slice(0, 3).map((pair, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between rounded-lg border border-slate-200 bg-white px-3 py-1.5"
+                      >
+                        <span>
+                          {pair.symptom_a} + {pair.symptom_b}
+                        </span>
+                        <span className="font-medium text-teal-700">
+                          {Math.round(pair.correlation_score * 100)}% ({pair.clinical_relevance})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {assessment.suggested_co_occurring_symptoms.length > 0 && (
+                  <div className="mt-3 text-xs">
+                    <p className="font-semibold text-slate-700">
+                      Related Co-Occurring Symptoms to Watch For:
+                    </p>
+                    <p className="mt-1 text-slate-600">
+                      {assessment.suggested_co_occurring_symptoms
+                        .map((s) => s.name)
+                        .join(", ")}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Integrated Baseline Medical History Context */}
+              <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Relevant Medical History Context
+                  </h3>
+                  <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
+                    {assessment.medical_history_context.previous_assessments_count} prior assessment(s)
+                  </span>
+                </div>
+
+                <dl className="mt-3 space-y-2 text-xs text-slate-700">
+                  <div>
+                    <dt className="font-semibold text-slate-900">Blood Group:</dt>
+                    <dd>
+                      {assessment.medical_history_context.blood_group || "Not specified"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-slate-900">Chronic Conditions:</dt>
+                    <dd>
+                      {assessment.medical_history_context.chronic_conditions.length > 0
+                        ? assessment.medical_history_context.chronic_conditions.join(", ")
+                        : "None recorded"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-slate-900">Known Allergies:</dt>
+                    <dd>
+                      {assessment.medical_history_context.allergies.length > 0
+                        ? assessment.medical_history_context.allergies.join(", ")
+                        : "None recorded"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-slate-900">Current Medications:</dt>
+                    <dd>
+                      {assessment.medical_history_context.current_medications.length > 0
+                        ? assessment.medical_history_context.current_medications
+                            .map((m) =>
+                              [m.name, m.dosage, m.frequency].filter(Boolean).join(" ")
+                            )
+                            .join(", ")
+                        : "None recorded"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-slate-900">Family History:</dt>
+                    <dd>
+                      {assessment.medical_history_context.family_history.length > 0
+                        ? assessment.medical_history_context.family_history.join(", ")
+                        : "None recorded"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+
+            <p className="mt-4 text-xs text-slate-500">
+              Disclaimer: This integrated symptom assessment provides preliminary insights for Module 3 disease prediction and does not constitute a medical diagnosis.
+            </p>
+          </section>
         )}
 
         <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
@@ -304,7 +495,15 @@ export function SymptomSelectionPage() {
 
                         <button
                           type="button"
-                          onClick={() => toggleSymptom(details!)}
+                          onClick={() =>
+                            details
+                              ? toggleSymptom(details)
+                              : setSelected((prev) =>
+                                  prev.filter(
+                                    (s) => s.symptom_id !== item.symptom_id
+                                  )
+                                )
+                          }
                           className="text-sm text-red-600 hover:underline"
                         >
                           Remove
@@ -363,10 +562,95 @@ export function SymptomSelectionPage() {
             </button>
 
             <p className="mt-3 text-center text-xs text-slate-500">
-              Your selection will be associated with your logged-in account.
+              Your selection will be integrated with your logged-in medical history.
             </p>
           </section>
         </div>
+
+        {/* Past Integrated Symptom Assessments History */}
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                My Symptom Analysis History ({historyList.length})
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Past symptom submissions integrated with your medical history.
+              </p>
+            </div>
+            <span className="text-xs text-slate-400">Newest first</span>
+          </div>
+
+          {loadingHistory ? (
+            <p className="py-6 text-center text-sm text-slate-500">
+              Loading past assessments...
+            </p>
+          ) : historyList.length === 0 ? (
+            <p className="mt-4 rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500">
+              No past symptom assessments found. Submit symptoms above to create your first record.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {historyList.map((item) => (
+                <div
+                  key={item.assessment_id}
+                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        Assessment #{item.assessment_id}
+                      </span>
+                      <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-teal-800">
+                        Coherence: {item.cluster_coherence}
+                      </span>
+                      {item.has_red_flags && (
+                        <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+                          Red Flags: {item.red_flag_symptoms.join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      {new Date(item.created_at).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {item.validated_symptoms.map((sym) => (
+                      <span
+                        key={sym.symptom_id}
+                        className="rounded-full border border-blue-200 bg-white px-2.5 py-0.5 text-xs font-medium text-blue-800"
+                      >
+                        {sym.name} ({sym.severity}, {sym.duration_days}d)
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 grid gap-2 border-t border-slate-200 pt-2.5 text-xs text-slate-600 sm:grid-cols-2">
+                    <div>
+                      <span className="font-semibold text-slate-800">
+                        Affected Systems:
+                      </span>{" "}
+                      <span className="capitalize">
+                        {item.primary_affected_systems
+                          .join(", ")
+                          .replace(/_/g, " ") || "General"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-800">
+                        Recorded Conditions at Time of Check:
+                      </span>{" "}
+                      {item.medical_history_context.chronic_conditions.length > 0
+                        ? item.medical_history_context.chronic_conditions.join(", ")
+                        : "None"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

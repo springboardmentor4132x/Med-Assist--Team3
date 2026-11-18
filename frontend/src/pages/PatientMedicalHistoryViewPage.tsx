@@ -5,6 +5,7 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
+  ClipboardList,
   Droplet,
   FileHeart,
   Pill,
@@ -16,7 +17,9 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../services/api";
 import { getPatientMedicalHistoryRequest } from "../services/medicalHistory";
+import { fetchPatientSymptomAssessments } from "../services/symptoms";
 import type { MedicalHistory } from "../types/medicalHistory";
+import type { IntegratedSymptomAssessmentResponse } from "../types/symptoms";
 
 export function PatientMedicalHistoryViewPage() {
   const { user } = useAuth();
@@ -24,6 +27,9 @@ export function PatientMedicalHistoryViewPage() {
 
   const [patientIdInput, setPatientIdInput] = useState("");
   const [history, setHistory] = useState<MedicalHistory | null>(null);
+  const [assessments, setAssessments] = useState<
+    IntegratedSymptomAssessmentResponse[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,10 +45,15 @@ export function PatientMedicalHistoryViewPage() {
     setLoading(true);
     setError(null);
     setHistory(null);
+    setAssessments([]);
 
     try {
-      const data = await getPatientMedicalHistoryRequest(parsedId);
-      setHistory(data);
+      const [historyData, assessmentData] = await Promise.all([
+        getPatientMedicalHistoryRequest(parsedId),
+        fetchPatientSymptomAssessments(parsedId),
+      ]);
+      setHistory(historyData);
+      setAssessments(assessmentData);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -84,10 +95,10 @@ export function PatientMedicalHistoryViewPage() {
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
-            Patient Medical History (Read-Only)
+            Patient Medical History &amp; Assessments (Read-Only)
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Enter a Patient ID to review their baseline conditions, allergies, medications, and lifestyle risks.
+            Enter a Patient ID to review their baseline conditions, allergies, medications, lifestyle risks, and integrated symptom assessments.
           </p>
         </div>
 
@@ -122,8 +133,8 @@ export function PatientMedicalHistoryViewPage() {
         )}
 
         {history && (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-xs text-teal-900">
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-xs text-teal-900">
               <span>
                 Showing medical history for <strong>Patient #{history.user_id}</strong>
               </span>
@@ -282,6 +293,93 @@ export function PatientMedicalHistoryViewPage() {
                 </div>
               </div>
             </div>
+
+            {/* Integrated Symptom Assessments History */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-teal-700" />
+                  <h3 className="text-base font-bold text-slate-900">
+                    Integrated Symptom Assessments ({assessments.length})
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-500">
+                  Newest first
+                </span>
+              </div>
+
+              {assessments.length === 0 ? (
+                <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                  No symptom assessments submitted by this patient yet.
+                </p>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  {assessments.map((item) => (
+                    <div
+                      key={item.assessment_id}
+                      className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900">
+                            Assessment #{item.assessment_id}
+                          </span>
+                          <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-teal-800">
+                            Coherence: {item.cluster_coherence}
+                          </span>
+                          {item.has_red_flags && (
+                            <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+                              Red Flags: {item.red_flag_symptoms.join(", ")}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-500">
+                          {new Date(item.created_at).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="mt-3">
+                        <p className="text-xs font-semibold text-slate-600">
+                          Reported Symptoms:
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {item.validated_symptoms.map((sym) => (
+                            <span
+                              key={sym.symptom_id}
+                              className="rounded-full border border-blue-200 bg-white px-2.5 py-0.5 text-xs font-medium text-blue-800"
+                            >
+                              {sym.name} ({sym.severity}, {sym.duration_days}d)
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 text-xs text-slate-600 sm:grid-cols-2">
+                        <div>
+                          <span className="font-semibold text-slate-800">
+                            Affected Systems:
+                          </span>{" "}
+                          {item.primary_affected_systems
+                            .join(", ")
+                            .replace(/_/g, " ") || "General"}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-800">
+                            Historical Snapshot Conditions:
+                          </span>{" "}
+                          {item.medical_history_context.chronic_conditions
+                            .length > 0
+                            ? item.medical_history_context.chronic_conditions.join(
+                                ", "
+                              )
+                            : "None"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
       </main>
