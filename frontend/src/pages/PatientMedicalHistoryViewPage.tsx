@@ -1,27 +1,22 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Activity,
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
+  ClipboardList,
   Droplet,
   FileHeart,
   Pill,
   Scissors,
   Search,
-  Stethoscope,
   Users,
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { AppNavbar } from "../components/AppNavbar";
 import { ApiError } from "../services/api";
 import { getPatientMedicalHistoryRequest } from "../services/medicalHistory";
 import type { MedicalHistory } from "../types/medicalHistory";
 
 export function PatientMedicalHistoryViewPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
   const [patientIdInput, setPatientIdInput] = useState("");
   const [history, setHistory] = useState<MedicalHistory | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,32 +51,9 @@ export function PatientMedicalHistoryViewPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-white">
-              <Stethoscope className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="font-bold text-slate-900">MedAssist AI</h1>
-              <p className="text-xs capitalize text-slate-500">
-                {user?.role} Portal — Patient Record Lookup
-              </p>
-            </div>
-          </div>
+      <AppNavbar />
 
-          <button
-            type="button"
-            onClick={() => navigate("/dashboard")}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Dashboard
-          </button>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
             Patient Medical History (Read-Only)
@@ -118,6 +90,20 @@ export function PatientMedicalHistoryViewPage() {
           <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             {error}
+          </div>
+        )}
+
+        {!history && !loading && !error && (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center shadow-xs">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+              <ClipboardList className="h-6 w-6" />
+            </div>
+            <h3 className="mt-4 text-base font-bold text-slate-900">
+              Ready to Look Up a Patient Record
+            </h3>
+            <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-slate-500">
+              Enter a numeric Patient User ID above (for example, <span className="font-semibold text-slate-700">1</span> for the seeded demo patient) to review their baseline conditions, medications, allergies, and lifestyle profile.
+            </p>
           </div>
         )}
 

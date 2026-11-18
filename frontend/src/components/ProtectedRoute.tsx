@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router-dom";
-import { ShieldAlert } from "lucide-react";
+import { Link, Navigate, useLocation } from "react-router-dom";
+import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import type { UserRole } from "../types/auth";
 
@@ -35,11 +35,18 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
             <ShieldAlert className="h-6 w-6" />
           </div>
-          <h1 className="mt-4 text-lg font-bold text-slate-900">Access Restricted (403)</h1>
+          <h1 className="mt-4 text-lg font-bold text-slate-900">Access Restricted</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Your signed-in role (<span className="font-semibold">{user.role}</span>) does not have
-            permission to view this module.
+            Your signed-in role (<span className="font-semibold capitalize">{user.role}</span>) does not have
+            permission to view this section.
           </p>
+          <Link
+            to="/dashboard"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-teal-800"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Return to Dashboard
+          </Link>
         </div>
       </div>
     );

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   UserRound,
   Mail,
   ShieldCheck,
@@ -18,6 +17,7 @@ import {
   FileHeart,
 } from "lucide-react";
 
+import { AppNavbar } from "../components/AppNavbar";
 import { useAuth } from "../context/AuthContext";
 import {
   ApiError,
@@ -53,7 +53,7 @@ const roleDetails: Record<
 };
 
 export function ProfilePage() {
-  const { user, setSessionNotice } = useAuth();
+  const { user, setSessionNotice, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -118,7 +118,8 @@ export function ProfilePage() {
       setEditing(false);
       setSuccess("Your profile has been updated successfully.");
 
-      // Keep the authenticated user information synchronized.
+      // Keep the authenticated user information synchronized across navbar and dashboard.
+      updateUser({ full_name: updated.full_name });
       setSessionNotice(null);
     } catch (err) {
       setError(
@@ -179,29 +180,9 @@ export function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-white">
-              <Stethoscope className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="font-bold text-slate-900">MedAssist AI</h1>
-              <p className="text-xs text-slate-500">Profile Management</p>
-            </div>
-          </div>
+      <AppNavbar />
 
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Dashboard
-          </button>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
             My Profile
@@ -411,9 +392,7 @@ export function ProfilePage() {
           </div>
 
           <p className="mt-4 text-xs leading-5 text-slate-500">
-            Access to protected resources is verified by the backend.
-            Changing information in this profile page cannot grant additional
-            permissions.
+            Account roles and clinical permissions are managed by your healthcare organization administrator.
           </p>
         </section>
 

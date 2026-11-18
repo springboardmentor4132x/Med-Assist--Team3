@@ -28,6 +28,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   sessionNotice: string | null;
   setSessionNotice: (notice: string | null) => void;
+  updateUser: (patch: Partial<User>) => void;
   login: (payload: LoginPayload, rememberMe: boolean) => Promise<User>;
   register: (payload: RegisterPayload, rememberMe: boolean) => Promise<User>;
   logout: () => Promise<void>;
@@ -115,6 +116,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
   }, []);
 
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -122,12 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       sessionNotice,
       setSessionNotice,
+      updateUser,
       login,
       register,
       logout,
       refreshSession,
     }),
-    [user, isLoading, sessionNotice, login, register, logout, refreshSession]
+    [user, isLoading, sessionNotice, updateUser, login, register, logout, refreshSession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

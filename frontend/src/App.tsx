@@ -24,7 +24,7 @@ export function AppRoutes() {
       <Route
         path="/medical-history"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["patient"]}>
             <MedicalHistoryPage />
           </ProtectedRoute>
         }
@@ -32,7 +32,7 @@ export function AppRoutes() {
       <Route
         path="/patient-history"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["doctor", "clinic", "admin"]}>
             <PatientMedicalHistoryViewPage />
           </ProtectedRoute>
         }

@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Activity,
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
   CheckCircle2,
   Droplet,
   FileHeart,
@@ -13,10 +11,10 @@ import {
   Plus,
   Save,
   Scissors,
-  Stethoscope,
   Users,
   X,
 } from "lucide-react";
+import { AppNavbar } from "../components/AppNavbar";
 import { ApiError } from "../services/api";
 import {
   getMyMedicalHistoryRequest,
@@ -43,8 +41,6 @@ const COMMON_CONDITIONS = [
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export function MedicalHistoryPage() {
-  const navigate = useNavigate();
-
   const [history, setHistory] = useState<MedicalHistory | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -183,31 +179,9 @@ export function MedicalHistoryPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header matching ProfilePage & DashboardPage */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-white">
-              <Stethoscope className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="font-bold text-slate-900">MedAssist AI</h1>
-              <p className="text-xs text-slate-500">Medical History Tracking</p>
-            </div>
-          </div>
+      <AppNavbar />
 
-          <button
-            type="button"
-            onClick={() => navigate("/dashboard")}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Dashboard
-          </button>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">

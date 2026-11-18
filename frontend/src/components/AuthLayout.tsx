@@ -10,21 +10,21 @@ interface AuthLayoutProps {
 const PLATFORM_HIGHLIGHTS = [
   {
     icon: Activity,
-    title: "Symptom Analysis & Disease Prediction",
+    title: "AI Symptom Analysis & Risk Screening",
     description:
-      "AI-driven symptom correlation, multi-disease probability scoring, and severity assessment.",
+      "Intelligent symptom correlation, clinical red-flag screening, and multi-system risk insights.",
   },
   {
     icon: ShieldCheck,
-    title: "Role-Based Access Control (RBAC)",
+    title: "Dedicated Clinical Care Portals",
     description:
-      "Dedicated workspaces for Patients, Doctors, Clinics, and System Administrators.",
+      "Tailored workspaces for Patients, Doctors, Clinics, and Healthcare Administrators.",
   },
   {
     icon: Lock,
-    title: "JWT + Server-Side Token Revocation",
+    title: "Clinical-Grade Privacy & Encryption",
     description:
-      "Short-lived signed access tokens, refresh rotation, lockout defense, and audit logging.",
+      "Encrypted sessions, automated lockout protection, and verified patient record access.",
   },
 ];
 
@@ -125,7 +125,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-400">
-            Protected by JWT Bearer Authentication &amp; Role-Based Access Control
+            Encrypted clinical sessions &amp; privacy-first health access
           </p>
         </div>
       </main>

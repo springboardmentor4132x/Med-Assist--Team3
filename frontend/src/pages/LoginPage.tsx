@@ -212,7 +212,7 @@ export function LoginPage() {
           </label>
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-teal-700">
             <ShieldCheck className="h-3.5 w-3.5" />
-            JWT Secured
+            Encrypted Session
           </span>
         </div>
 
@@ -235,7 +235,7 @@ export function LoginPage() {
       {demoAccounts.length > 0 && (
         <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-            Dev Quick-Fill Roles
+            Demo Portal Accounts
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {demoAccounts.map((account) => (
