@@ -1,21 +1,16 @@
 """API routes for Module 2: Symptom Validation and Correlation Analysis."""
 
 from collections import defaultdict
-
-from fastapi import APIRouter, HTTPException, Query, status
-
-from app.data.symptoms_dataset import SYMPTOM_CATALOG
-
-from fastapi import Depends
-from sqlalchemy.orm import Session
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.data.symptoms_dataset import SYMPTOM_CATALOG
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db
 from app.models import SymptomSubmission, User
 
+from app.api.deps import get_current_user, get_db, require_roles
+from app.models.user import User, UserRole
 from app.schemas.symptoms import (
+    IntegratedSymptomAssessmentResponse,
     SymptomAnalysisRequest,
     SymptomAnalysisResponse,
     SymptomCatalogItem,
@@ -23,7 +18,14 @@ from app.schemas.symptoms import (
     SymptomValidationRequest,
     SymptomValidationResponse,
 )
-from app.services.symptom_service import compute_symptom_correlations, validate_symptoms_input
+from app.services.symptom_service import (
+    compute_symptom_correlations,
+    create_integrated_symptom_assessment,
+    get_patient_assessments_for_provider,
+    get_user_symptom_assessments,
+    validate_symptoms_input,
+)
+
 
 router = APIRouter(prefix="/symptoms", tags=["Symptom Analysis"])
 
@@ -154,45 +156,53 @@ def analyze_symptoms(payload: SymptomAnalysisRequest) -> SymptomAnalysisResponse
         potential_disease_categories=potential_categories,
     )
 
-@router.post("/submit", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/submit",
+    response_model=IntegratedSymptomAssessmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Validate, analyze, and integrate symptoms with the patient's medical history",
+)
 def submit_symptoms(
     payload: SymptomAnalysisRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Validate and save symptoms for the logged-in user."""
-
-    is_valid, validated_symptoms, warnings, errors = validate_symptoms_input(
-        payload.symptoms
-    )
-
-    if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[error.model_dump() for error in errors],
-        )
-
-    symptoms_data = [
-        symptom.model_dump(mode="json")
-        for symptom in validated_symptoms
-    ]
-
-    submission = SymptomSubmission(
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> IntegratedSymptomAssessmentResponse:
+    """Execute full Module 2 pipeline: validation, correlation analysis, and medical history integration."""
+    return create_integrated_symptom_assessment(
+        db=db,
         user_id=current_user.id,
-        symptoms=symptoms_data,
+        raw_items=payload.symptoms,
     )
 
-    db.add(submission)
-    db.commit()
-    db.refresh(submission)
 
-    return {
-        "message": "Symptoms submitted successfully.",
-        "submission_id": submission.id,
-        "user_id": submission.user_id,
-        "symptoms": symptoms_data,
-        "warnings": [
-            warning.model_dump(mode="json") for warning in warnings
-        ],
-        "created_at": submission.created_at,
-    }
+@router.get(
+    "/assessments/me",
+    response_model=list[IntegratedSymptomAssessmentResponse],
+    summary="Retrieve the logged-in patient's past integrated symptom assessments",
+)
+def get_my_symptom_assessments(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PATIENT)),
+) -> list[IntegratedSymptomAssessmentResponse]:
+    """Return past integrated symptom assessments for the authenticated patient."""
+    return get_user_symptom_assessments(db=db, user_id=current_user.id, limit=limit)
+
+
+@router.get(
+    "/assessments/patient/{patient_id}",
+    response_model=list[IntegratedSymptomAssessmentResponse],
+    summary="Allow authorized providers/admins to inspect a patient's integrated assessments",
+)
+def get_patient_symptom_assessments(
+    patient_id: int,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles(UserRole.DOCTOR, UserRole.CLINIC, UserRole.ADMIN)
+    ),
+) -> list[IntegratedSymptomAssessmentResponse]:
+    """Read-only access to a patient's integrated symptom + medical history assessments."""
+    return get_patient_assessments_for_provider(
+        db=db, patient_id=patient_id, limit=limit
+    )
