@@ -1,0 +1,2 @@
+Model,Accuracy,Precision (Weighted),Recall (Weighted),F1-Score (Weighted)
+Random Forest,0.13846153846153847,0.181978021978022,0.13846153846153847,0.1523809523809524

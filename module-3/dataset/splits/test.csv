@@ -1,0 +1,66 @@
+Fever,Cough,Fatigue,Difficulty Breathing,Age,Gender,Blood Pressure_High,Blood Pressure_Low,Blood Pressure_Normal,Cholesterol Level_High,Cholesterol Level_Low,Cholesterol Level_Normal,Disease
+1,0,0,0,25,0,0,0,1,0,0,1,Eczema
+0,1,0,0,28,0,0,0,1,0,0,1,Hyperthyroidism
+0,1,0,0,28,0,0,0,1,0,0,1,Hyperthyroidism
+0,1,0,0,29,0,0,0,1,0,0,1,Gastroenteritis
+0,0,1,0,30,1,0,0,1,0,0,1,Kidney Cancer
+0,0,1,0,30,1,1,0,0,1,0,0,Muscular Dystrophy
+1,1,0,0,30,0,0,0,1,0,0,1,Ulcerative Colitis
+1,1,0,1,30,0,0,0,1,0,0,1,Asthma
+1,1,0,1,30,0,0,0,1,0,0,1,Asthma
+1,1,1,0,30,1,1,0,0,0,0,1,Influenza
+1,0,0,0,31,0,0,0,1,0,0,1,Migraine
+0,0,1,0,35,0,0,0,1,0,1,0,Allergic Rhinitis
+0,1,1,1,35,0,0,0,1,1,0,0,Asthma
+0,1,1,1,35,0,1,0,0,0,0,1,Asthma
+0,1,1,1,35,0,1,0,0,0,0,1,Asthma
+0,1,1,0,35,1,1,0,0,1,0,0,Urinary Tract Infection (UTI)
+0,0,1,0,35,0,0,0,1,1,0,0,Cirrhosis
+0,0,1,0,35,0,0,0,1,1,0,0,Depression
+0,1,1,0,35,1,1,0,0,1,0,0,Migraine
+0,0,1,0,35,0,0,0,1,0,1,0,Rheumatoid Arthritis
+1,0,1,0,35,0,0,0,1,1,0,0,Urinary Tract Infection
+0,0,1,0,38,0,0,1,0,0,0,1,Kidney Disease
+1,1,1,1,38,1,0,0,1,0,0,1,Pneumonia
+0,0,1,0,39,0,0,0,1,0,0,1,Klinefelter Syndrome
+1,0,0,0,40,0,1,0,0,1,0,0,Diabetes
+1,1,0,1,40,0,0,0,1,0,0,1,Asthma
+1,1,0,1,40,0,0,0,1,0,0,1,Asthma
+1,0,1,1,40,1,0,0,1,1,0,0,Asthma
+1,0,1,1,40,1,0,0,1,1,0,0,Asthma
+0,0,1,0,40,1,1,0,0,1,0,0,Hyperthyroidism
+0,1,0,0,40,0,0,0,1,1,0,0,Lymphoma
+0,1,0,0,40,0,0,0,1,1,0,0,Psoriasis
+0,1,0,0,42,0,0,0,1,1,0,0,Influenza
+1,0,0,1,42,0,0,0,1,0,0,1,Liver Disease
+1,1,1,0,42,1,1,0,0,1,0,0,Migraine
+1,0,1,0,42,1,0,0,1,0,1,0,Stroke
+0,1,1,0,45,1,1,0,0,0,0,1,Allergic Rhinitis
+0,0,0,0,45,0,0,1,0,0,0,1,Migraine
+0,0,0,0,45,0,0,1,0,0,0,1,Urinary Tract Infection
+1,1,0,1,45,1,0,0,1,0,0,1,Asthma
+1,1,0,1,45,1,0,0,1,0,0,1,Asthma
+0,0,1,0,45,0,0,0,1,1,0,0,Cataracts
+0,0,1,0,48,1,0,0,1,1,0,0,Hypothyroidism
+0,0,1,0,48,1,0,0,1,1,0,0,Hypothyroidism
+1,1,0,1,50,1,1,0,0,0,0,1,Urinary Tract Infection
+0,1,1,1,50,1,1,0,0,1,0,0,Liver Cancer
+0,1,1,1,50,1,1,0,0,1,0,0,Stroke
+1,1,1,1,55,1,1,0,0,0,0,1,Bronchitis
+0,1,0,0,55,0,0,0,1,1,0,0,Diabetes
+0,0,0,0,55,0,1,0,0,1,0,0,Hemorrhoids
+0,0,1,0,55,0,1,0,0,1,0,0,Hypothyroidism
+1,1,0,0,55,0,1,0,0,1,0,0,Osteoarthritis
+1,1,0,1,57,1,0,0,1,1,0,0,Pneumonia
+1,0,1,0,60,1,1,0,0,0,0,1,Hypertension
+0,0,0,0,60,0,1,0,0,1,0,0,Hypertension
+1,0,1,0,60,1,1,0,0,0,0,1,Osteoporosis
+1,1,1,0,60,0,1,0,0,1,0,0,Tuberculosis
+1,0,1,0,65,1,1,0,0,0,0,1,Urinary Tract Infection (UTI)
+1,0,1,1,65,1,1,0,0,1,0,0,Bronchitis
+0,1,1,0,65,0,1,0,0,1,0,0,Osteoporosis
+0,1,1,1,70,1,0,0,1,1,0,0,Chronic Obstructive Pulmonary Disease (COPD)
+0,1,1,1,70,1,0,0,1,1,0,0,Chronic Obstructive Pulmonary Disease (COPD)
+0,0,1,0,70,0,1,0,0,1,0,0,Testicular Cancer
+1,0,1,0,80,0,1,0,0,1,0,0,Stroke
+1,0,1,0,80,0,1,0,0,1,0,0,Stroke
