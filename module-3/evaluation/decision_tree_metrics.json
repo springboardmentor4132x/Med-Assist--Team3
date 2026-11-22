@@ -1,0 +1,10 @@
+{
+    "model": "Decision Tree",
+    "accuracy": 0.7049180327868853,
+    "precision_macro": 0.6046747967479674,
+    "recall_macro": 0.6341463414634146,
+    "f1_macro": 0.5907859078590786,
+    "precision_weighted": 0.7124316939890709,
+    "recall_weighted": 0.7049180327868853,
+    "f1_weighted": 0.6812386156648452
+}

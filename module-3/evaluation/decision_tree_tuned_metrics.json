@@ -1,0 +1,11 @@
+{
+    "model": "Tuned Decision Tree",
+    "accuracy": 0.6885245901639344,
+    "precision_macro": 0.5840108401084011,
+    "recall_macro": 0.6219512195121951,
+    "f1_macro": 0.5772357723577235,
+    "precision_weighted": 0.6766848816029143,
+    "recall_weighted": 0.6885245901639344,
+    "f1_weighted": 0.6579234972677596,
+    "best_cross_validation_macro_f1": 0.6707946186604723
+}

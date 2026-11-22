@@ -1,0 +1,32 @@
+### Decision Tree Model — Evaluation Summary
+
+**Algorithm:** Decision Tree Classifier  
+**Dataset:** Disease Prediction Using Symptoms  
+**Training records:** 243  
+**Testing records:** 61  
+**Features:** 132  
+**Disease classes:** 41
+
+**Baseline model performance:**
+- Accuracy: 70.49%
+- Macro Precision: 60.47%
+- Macro Recall: 63.41%
+- Macro F1-score: 59.08%
+- Weighted F1-score: 68.12%
+
+**Hyperparameter tuning:**
+
+GridSearchCV was performed using 4-fold Stratified Cross-Validation, with macro F1-score as the optimization metric. The best configuration used Gini criterion, no maximum depth restriction, minimum samples split of 5, and minimum samples leaf of 1.
+
+Best cross-validation macro F1-score: 0.6708.
+
+**Tuned model test performance:**
+- Accuracy: 68.85%
+- Macro Precision: 58.40%
+- Macro Recall: 62.20%
+- Macro F1-score: 57.72%
+- Weighted F1-score: 65.79%
+
+**Conclusion:**
+
+The baseline Decision Tree achieved better performance than the tuned Decision Tree on the held-out test set. Therefore, the baseline model is retained as the current Decision Tree candidate. The results should be interpreted cautiously because the dataset contains a limited number of unique records per disease class.
