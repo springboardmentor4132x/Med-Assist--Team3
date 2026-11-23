@@ -53,3 +53,38 @@ class DiseaseProbabilityResponse(BaseModel):
     total_conditions_evaluated: int = Field(..., description="Total number of clinical conditions evaluated.")
     evaluated_symptoms: list[str] = Field(..., description="Standardized patient symptoms processed.")
     dominant_category: str = Field(..., description="Most prevalent medical category among top candidates.")
+
+
+class DifferentialCandidate(BaseModel):
+    """A ranked condition in the differential diagnosis evaluation (Module 3 Component 3)."""
+
+    rank: int = Field(..., description="Rank order by probability likelihood (1-based index).")
+    disease: str = Field(..., description="Machine-readable disease identifier.")
+    display_name: str = Field(..., description="Full clinical title.")
+    category: str = Field(..., description="Medical or organ category.")
+    icd10: str = Field(..., description="ICD-10 classification code.")
+    urgency_level: str = Field(..., description="Urgency rating (low, moderate, high, emergency).")
+    probability: float = Field(..., description="Calibrated probability float.")
+    probability_percent: float = Field(..., description="Probability expressed as a percentage.")
+    matched_symptoms: list[str] = Field(..., description="Patient symptoms matching this diagnosis.")
+    missing_hallmark_symptoms: list[str] = Field(
+        ..., description="Key hallmark symptoms expected for this disease not reported by the patient."
+    )
+    clinical_rationale: str = Field(..., description="Evidence rationale explaining why this diagnosis was ranked.")
+    recommended_diagnostic_tests: list[str] = Field(
+        ..., description="Standard clinical lab tests or imaging recommended to confirm or rule out."
+    )
+
+
+class DifferentialDiagnosisResponse(BaseModel):
+    """Response returned for multi-disease differential diagnosis prediction."""
+
+    query_symptoms: list[str] = Field(..., description="Patient symptoms evaluated.")
+    candidates: list[DifferentialCandidate] = Field(
+        ..., description="Ranked differential diagnosis candidates with comparative clinical evidence."
+    )
+    highest_urgency: str = Field(..., description="Highest urgency among all plausible candidates.")
+    total_candidates: int = Field(..., description="Number of differential candidates returned.")
+    clinical_triage_guidance: str = Field(
+        ..., description="Clinical triage advice based on urgency and symptom constellation."
+    )

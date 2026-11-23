@@ -306,3 +306,207 @@ def predict_disease_probabilities(symptoms: list[str], top_n: int = 5) -> dict[s
     """Convenience helper to predict probability distributions across candidate diseases."""
     classifier = DiseaseMLClassifier.get_instance()
     return classifier.predict_probabilities(symptoms, top_n=top_n)
+
+
+DIAGNOSTIC_TESTS_MAP: dict[str, list[str]] = {
+    "Diabetes": [
+        "Fasting Plasma Glucose (FPG)",
+        "HbA1c Glycated Hemoglobin Test",
+        "Oral Glucose Tolerance Test (OGTT)",
+        "Urinalysis for Microalbumin & Ketones",
+    ],
+    "Hypertension": [
+        "24-Hour Ambulatory Blood Pressure Monitoring (ABPM)",
+        "12-Lead Electrocardiogram (ECG)",
+        "Basic Metabolic Panel (Electrolytes, Creatinine, eGFR)",
+    ],
+    "Bronchial Asthma": [
+        "Spirometry Pre- and Post-Bronchodilator",
+        "Fractional Exhaled Nitric Oxide (FeNO)",
+        "Peak Expiratory Flow (PEF) Monitoring",
+        "Allergy Skin Prick Testing",
+    ],
+    "Pneumonia": [
+        "Chest Radiograph (CXR)",
+        "Complete Blood Count (CBC) with Differential",
+        "Sputum Gram Stain and Culture",
+        "Pulse Oximetry",
+    ],
+    "Malaria": [
+        "Thick and Thin Blood Smears",
+        "Rapid Diagnostic Test (RDT) for Plasmodium",
+        "Complete Blood Count (CBC)",
+    ],
+    "Dengue": [
+        "Dengue NS1 Antigen ELISA",
+        "Dengue IgM/IgG Serology",
+        "Serial Platelet Count and Hematocrit",
+    ],
+    "Typhoid": [
+        "Blood Culture for Salmonella Typhi",
+        "Widal Agglutination Serology",
+        "TyphiDot IgM Test",
+        "Stool Culture",
+    ],
+    "Tuberculosis": [
+        "GeneXpert MTB/RIF Assay",
+        "Acid-Fast Bacilli (AFB) Sputum Smear Microscopy",
+        "Chest X-Ray (Posterior-Anterior)",
+        "Interferon-Gamma Release Assay (IGRA)",
+    ],
+    "Common Cold": [
+        "Clinical Upper Airway Examination",
+        "Rapid Multiplex Viral Swab (if atypical or severe)",
+    ],
+    "GERD": [
+        "Upper Gastrointestinal Endoscopy (EGD)",
+        "24-Hour Ambulatory Esophageal pH/Impedance Study",
+    ],
+    "Peptic Ulcer": [
+        "Helicobacter pylori Stool Antigen or Urea Breath Test",
+        "Upper GI Endoscopy with Biopsy",
+        "Complete Blood Count for Anemia",
+    ],
+    "Gastroenteritis": [
+        "Stool Microscopy and Enteric Culture",
+        "Serum Electrolytes and Renal Function Panel",
+        "Stool Multiplex PCR Panel",
+    ],
+    "Migraine": [
+        "Comprehensive Neurological Examination",
+        "Brain MRI/CT (if atypical or red-flag signs)",
+    ],
+    "Heart Attack": [
+        "12-Lead Serial Electrocardiogram (ECG)",
+        "High-Sensitivity Cardiac Troponin I/T",
+        "Emergency Transthoracic Echocardiogram (TTE)",
+        "Urgent Coronary Angiography",
+    ],
+    "Jaundice": [
+        "Fractionated Serum Bilirubin (Total, Direct, Indirect)",
+        "Liver Enzyme Panel (ALT, AST, ALP, GGT)",
+        "Abdominal Ultrasonography",
+    ],
+    "Hepatitis": [
+        "Viral Hepatitis Serology Panel (Anti-HAV IgM, HBsAg, Anti-HCV)",
+        "Liver Function Tests (LFTs)",
+        "Abdominal Ultrasound",
+    ],
+    "Urinary Tract Infection": [
+        "Urinalysis (Leukocyte Esterase, Nitrites, Microscopic)",
+        "Urine Culture and Antibiotic Sensitivity",
+        "Renal Ultrasound (if recurrent or febrile)",
+    ],
+    "Arthritis": [
+        "Rheumatoid Factor (RF) and Anti-CCP Antibodies",
+        "ESR and C-Reactive Protein (CRP) Inflammatory Markers",
+        "Plain Radiography of Affected Joints",
+    ],
+    "Allergy": [
+        "Specific IgE Blood Test (ImmunoCAP)",
+        "Skin Prick Testing",
+        "Total Serum IgE Level",
+    ],
+    "COVID-19": [
+        "SARS-CoV-2 RT-PCR Nasopharyngeal Swab",
+        "Rapid Antigen Detection Test (RADT)",
+        "Resting and Exertional Pulse Oximetry",
+    ],
+    "Hypothyroidism": [
+        "Serum Thyroid Stimulating Hormone (TSH)",
+        "Free Thyroxine (Free T4)",
+        "Anti-Thyroid Peroxidase (Anti-TPO) Antibodies",
+    ],
+    "Hyperthyroidism": [
+        "Serum Thyroid Stimulating Hormone (TSH)",
+        "Free T3 and Free T4",
+        "TSH Receptor Antibodies (TRAb)",
+        "Radioactive Iodine Uptake (RAIU) Scan",
+    ],
+}
+
+URGENCY_RANK: dict[str, int] = {
+    "emergency": 4,
+    "high": 3,
+    "moderate": 2,
+    "low": 1,
+}
+
+
+def predict_differential_diagnoses(symptoms: list[str], top_n: int = 5) -> dict[str, Any]:
+    """Generate comprehensive differential diagnoses with comparative evidence (Module 3 Component 3)."""
+    classifier = DiseaseMLClassifier.get_instance()
+    prob_res = classifier.predict_probabilities(symptoms, top_n=top_n)
+
+    candidates: list[dict[str, Any]] = []
+    highest_urgency = "low"
+    max_urgency_score = 0
+
+    for i, item in enumerate(prob_res["probabilities"]):
+        d_name = item["disease"]
+        profile = DISEASE_PROFILES.get(d_name)
+        urgency = item["urgency_level"]
+
+        if URGENCY_RANK.get(urgency, 1) > max_urgency_score:
+            max_urgency_score = URGENCY_RANK.get(urgency, 1)
+            highest_urgency = urgency
+
+        if profile:
+            primaries = profile["primary_symptoms"]
+            matched_set = set(item["matched_symptoms"])
+            missing_hallmarks = [s for s in primaries if s not in matched_set]
+            m_str = ", ".join(item["matched_symptoms"]) if item["matched_symptoms"] else "general presentation"
+            miss_str = ", ".join(missing_hallmarks) if missing_hallmarks else "none"
+            rationale = (
+                f"Ranked #{i+1} ({item['probability_percent']}% likelihood) based on {len(item['matched_symptoms'])} "
+                f"matching symptoms ({m_str}). Expected hallmark symptoms not noted: {miss_str}."
+            )
+        else:
+            missing_hallmarks = []
+            rationale = f"Ranked #{i+1} based on general clinical profile similarity."
+
+        tests = DIAGNOSTIC_TESTS_MAP.get(
+            d_name, ["Complete Blood Count (CBC)", "Comprehensive Metabolic Panel", "Clinical Assessment"]
+        )
+
+        candidates.append({
+            "rank": i + 1,
+            "disease": d_name,
+            "display_name": item["display_name"],
+            "category": item["category"],
+            "icd10": item["icd10"],
+            "urgency_level": urgency,
+            "probability": item["probability"],
+            "probability_percent": item["probability_percent"],
+            "matched_symptoms": item["matched_symptoms"],
+            "missing_hallmark_symptoms": missing_hallmarks,
+            "clinical_rationale": rationale,
+            "recommended_diagnostic_tests": tests,
+        })
+
+    if highest_urgency == "emergency":
+        triage_guidance = (
+            "CRITICAL: Immediate emergency medical evaluation is strongly recommended. "
+            "High-risk conditions (such as Acute Myocardial Infarction) are represented in the differential diagnoses."
+        )
+    elif highest_urgency == "high":
+        triage_guidance = (
+            "URGENT: Same-day medical consultation is advised. "
+            "Active infectious or respiratory pathology requires prompt clinical testing and targeted therapy."
+        )
+    elif highest_urgency == "moderate":
+        triage_guidance = (
+            "MODERATE: Clinical consultation is recommended within 24-48 hours for definitive diagnostic confirmation."
+        )
+    else:
+        triage_guidance = (
+            "ROUTINE: Monitor clinical trajectory and maintain supportive care. Consult a healthcare provider if symptoms worsen."
+        )
+
+    return {
+        "query_symptoms": prob_res["evaluated_symptoms"],
+        "candidates": candidates,
+        "highest_urgency": highest_urgency,
+        "total_candidates": len(candidates),
+        "clinical_triage_guidance": triage_guidance,
+    }

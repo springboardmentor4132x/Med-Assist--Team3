@@ -3,12 +3,14 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.schemas.disease_prediction import (
+    DifferentialDiagnosisResponse,
     DiseaseClassificationRequest,
     DiseaseClassificationResponse,
     DiseaseProbabilityResponse,
 )
 from app.services.disease_ml_service import (
     classify_patient_symptoms,
+    predict_differential_diagnoses,
     predict_disease_probabilities,
 )
 
@@ -60,4 +62,28 @@ def get_disease_probabilities(payload: DiseaseClassificationRequest) -> DiseaseP
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Probability scoring error: {exc}",
+        )
+
+
+@router.post(
+    "/differential",
+    response_model=DifferentialDiagnosisResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate multi-disease differential diagnoses with comparative clinical evidence",
+    description="Analyzes symptom overlap, missing hallmark features, and ranks candidate diagnoses with diagnostic tests and triage advice.",
+)
+def get_differential_diagnosis(payload: DiseaseClassificationRequest) -> DifferentialDiagnosisResponse:
+    if not payload.symptoms:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one symptom must be provided for differential diagnosis analysis.",
+        )
+
+    try:
+        result = predict_differential_diagnoses(payload.symptoms)
+        return DifferentialDiagnosisResponse(**result)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Differential diagnosis engine error: {exc}",
         )
