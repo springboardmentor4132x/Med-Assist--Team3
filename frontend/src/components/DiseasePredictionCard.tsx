@@ -87,7 +87,7 @@ export const DiseasePredictionCard: React.FC<Props> = ({ prediction }) => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
-                Module 3 Diagnostic Engine
+                Clinical Diagnostic Assessment
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700 border border-teal-200">
                 <Sparkles className="h-3 w-3" /> ML Multi-Class Prediction
@@ -170,13 +170,13 @@ export const DiseasePredictionCard: React.FC<Props> = ({ prediction }) => {
         <p>{classification.description}</p>
       </div>
 
-      {/* Component 2: Calibrated Probability Distribution */}
+      {/* Calibrated Probability Distribution */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-teal-700" />
             <h3 className="text-sm font-bold text-slate-900">
-              Calibrated Probability Score Distribution (Component 2)
+              Calibrated Probability Score Distribution
             </h3>
           </div>
           <span className="text-[11px] text-slate-400 font-medium">
@@ -227,13 +227,13 @@ export const DiseasePredictionCard: React.FC<Props> = ({ prediction }) => {
         </div>
       </div>
 
-      {/* Component 3: Differential Diagnosis & Confirmatory Workup */}
+      {/* Differential Diagnosis & Confirmatory Workup */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-teal-700" />
             <h3 className="text-sm font-bold text-slate-900">
-              Differential Diagnosis &amp; Recommended Workup (Component 3)
+              Differential Diagnosis &amp; Recommended Workup
             </h3>
           </div>
         </div>
