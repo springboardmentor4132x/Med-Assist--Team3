@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Activity,
   AlertCircle,
   AlertTriangle,
   Check,
   CheckCircle2,
+  FileText,
   HeartPulse,
+  History,
   Loader2,
   Plus,
   Search,
@@ -14,16 +17,17 @@ import {
   X,
 } from "lucide-react";
 import { AppNavbar } from "../components/AppNavbar";
-import { useAuth } from "../context/AuthContext";
+import { DiseasePredictionCard } from "../components/DiseasePredictionCard";
 import {
-  analyzeSymptoms,
+  fetchMySymptomAssessments,
   fetchSymptomsCatalog,
   submitSelectedSymptoms,
-  type SymptomSubmissionResponse,
 } from "../services/symptoms";
+import { fetchComprehensivePrediction } from "../services/predictions";
+import type { ComprehensivePredictionResponse } from "../types/predictions";
 import type {
   ClusterCoherence,
-  SymptomAnalysisResponse,
+  IntegratedSymptomAssessmentResponse,
   SymptomCatalogItem,
   SymptomInputItem,
   SymptomSeverity,
@@ -52,7 +56,6 @@ function formatLabel(value: string): string {
 }
 
 export function SymptomSelectionPage() {
-  const { user } = useAuth();
   const resultsRef = useRef<HTMLElement | null>(null);
 
   const [catalog, setCatalog] = useState<SymptomCatalogItem[]>([]);
@@ -63,8 +66,15 @@ export function SymptomSelectionPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [submission, setSubmission] = useState<SymptomSubmissionResponse | null>(null);
-  const [analysis, setAnalysis] = useState<SymptomAnalysisResponse | null>(null);
+  const [assessment, setAssessment] =
+    useState<IntegratedSymptomAssessmentResponse | null>(null);
+  const [diseasePrediction, setDiseasePrediction] =
+    useState<ComprehensivePredictionResponse | null>(null);
+
+  const [historyList, setHistoryList] = useState<
+    IntegratedSymptomAssessmentResponse[]
+  >([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -85,89 +95,104 @@ export function SymptomSelectionPage() {
       }
     }
 
+    async function loadHistory() {
+      try {
+        setLoadingHistory(true);
+        const data = await fetchMySymptomAssessments();
+        if (active) setHistoryList(data);
+      } catch {
+        // Patient may have no history records yet
+      } finally {
+        if (active) setLoadingHistory(false);
+      }
+    }
+
     void loadCatalog();
+    void loadHistory();
+
     return () => {
       active = false;
     };
   }, []);
 
-  const catalogById = useMemo(() => {
-    const map = new Map<string, SymptomCatalogItem>();
-    for (const item of catalog) {
-      map.set(item.id, item);
-    }
-    return map;
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    catalog.forEach((item) => {
+      if (item.category) set.add(item.category);
+    });
+    return ["All", ...Array.from(set).sort()];
   }, [catalog]);
 
-  const categories = useMemo(
-    () => ["All", ...Array.from(new Set(catalog.map((item) => item.category)))],
-    [catalog]
-  );
-
-  const filteredSymptoms = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return catalog.filter((symptom) => {
-      if (redFlagsOnly && !symptom.is_red_flag) return false;
-      const matchesCategory =
-        category === "All" || symptom.category === category;
-      const matchesSearch =
-        !term ||
-        symptom.name.toLowerCase().includes(term) ||
-        symptom.id.toLowerCase().includes(term) ||
-        symptom.description.toLowerCase().includes(term) ||
-        symptom.aliases.some((alias) => alias.toLowerCase().includes(term));
-
-      return matchesCategory && matchesSearch;
-    });
-  }, [catalog, search, category, redFlagsOnly]);
-
   const selectedIds = useMemo(
-    () => new Set(selected.map((item) => item.symptom_id)),
+    () => new Set(selected.map((s) => s.symptom_id)),
     [selected]
   );
 
-  function addSymptomById(symptomId: string) {
-    setError("");
-    if (selectedIds.has(symptomId)) return;
-    if (selected.length >= 30) {
-      setError("You can select a maximum of 30 symptoms per assessment.");
-      return;
-    }
+  const catalogMap = useMemo(() => {
+    const map = new Map<string, SymptomCatalogItem>();
+    catalog.forEach((item) => map.set(item.id, item));
+    return map;
+  }, [catalog]);
+
+  const filteredCatalog = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return catalog.filter((item) => {
+      if (category !== "All" && item.category !== category) return false;
+      if (redFlagsOnly && !item.is_red_flag) return false;
+      if (!q) return true;
+
+      const nameMatch = item.name.toLowerCase().includes(q);
+      const catMatch = item.category.toLowerCase().includes(q);
+      const aliasMatch = item.aliases.some((a) => a.toLowerCase().includes(q));
+      return nameMatch || catMatch || aliasMatch;
+    });
+  }, [catalog, search, category, redFlagsOnly]);
+
+  function toggleSymptom(item: SymptomCatalogItem) {
+    setSelected((prev) => {
+      const exists = prev.some((s) => s.symptom_id === item.id);
+      if (exists) {
+        return prev.filter((s) => s.symptom_id !== item.id);
+      }
+      return [
+        ...prev,
+        {
+          symptom_id: item.id,
+          severity: "moderate",
+          duration_days: 2,
+        },
+      ];
+    });
+  }
+
+  function addSymptomById(id: string) {
+    if (selectedIds.has(id)) return;
+    const catItem = catalogMap.get(id);
     setSelected((prev) => [
       ...prev,
-      { symptom_id: symptomId, severity: "moderate", duration_days: 1 },
+      {
+        symptom_id: id,
+        severity: catItem?.is_red_flag ? "severe" : "moderate",
+        duration_days: 2,
+      },
     ]);
   }
 
-  function removeSymptomById(symptomId: string) {
-    setError("");
-    setSelected((prev) => prev.filter((item) => item.symptom_id !== symptomId));
-  }
-
-  function toggleSymptom(symptom: SymptomCatalogItem) {
-    if (selectedIds.has(symptom.id)) {
-      removeSymptomById(symptom.id);
-    } else {
-      addSymptomById(symptom.id);
-    }
+  function removeSymptomById(id: string) {
+    setSelected((prev) => prev.filter((s) => s.symptom_id !== id));
   }
 
   function updateSeverity(id: string, severity: SymptomSeverity) {
     setSelected((prev) =>
-      prev.map((item) =>
-        item.symptom_id === id ? { ...item, severity } : item
-      )
+      prev.map((s) => (s.symptom_id === id ? { ...s, severity } : s))
     );
   }
 
-  function updateDuration(id: string, rawValue: string) {
-    const parsed = Number.parseInt(rawValue, 10);
-    const clamped = Number.isNaN(parsed) ? 1 : Math.min(365, Math.max(1, parsed));
+  function updateDuration(id: string, raw: string) {
+    const parsed = parseInt(raw, 10);
+    const duration_days = Number.isNaN(parsed) ? 1 : Math.max(1, Math.min(365, parsed));
     setSelected((prev) =>
-      prev.map((item) =>
-        item.symptom_id === id ? { ...item, duration_days: clamped } : item
-      )
+      prev.map((s) => (s.symptom_id === id ? { ...s, duration_days } : s))
     );
   }
 
@@ -181,13 +206,15 @@ export function SymptomSelectionPage() {
       setSubmitting(true);
       setError("");
 
-      const [submissionRes, analysisRes] = await Promise.all([
+      const symptomIds = selected.map((s) => s.symptom_id);
+      const [assessmentRes, predictionRes] = await Promise.all([
         submitSelectedSymptoms(selected),
-        analyzeSymptoms(selected, user?.id),
+        fetchComprehensivePrediction(symptomIds).catch(() => null),
       ]);
 
-      setSubmission(submissionRes);
-      setAnalysis(analysisRes);
+      setAssessment(assessmentRes);
+      setDiseasePrediction(predictionRes);
+      setHistoryList((prev) => [assessmentRes, ...prev]);
 
       window.requestAnimationFrame(() => {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -211,189 +238,225 @@ export function SymptomSelectionPage() {
           <div>
             <div className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">
               <HeartPulse className="h-3.5 w-3.5" />
-              AI Symptom Screening &amp; Correlation
+              Clinical Symptom Screening &amp; Medical History Integration
             </div>
-            <h1 className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Symptom Checker
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              Symptom Checker &amp; Clinical Correlation
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Select your current symptoms, specify severity and duration, and run clinical co-occurrence analysis.
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
+              Select symptoms, specify clinical severity and duration, and run real-time correlation analysis integrated with your baseline medical history.
             </p>
           </div>
-          {catalog.length > 0 && (
-            <p className="text-xs font-medium text-slate-500">
-              Showing <span className="font-semibold text-slate-800">{filteredSymptoms.length}</span> of{" "}
-              <span className="font-semibold text-slate-800">{catalog.length}</span> clinical symptoms
-            </p>
-          )}
+
+          <div className="flex items-center gap-3">
+            <Link
+              to="/medical-history"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-800 transition hover:bg-teal-100"
+            >
+              <FileText className="h-4 w-4" />
+              Manage Medical History
+            </Link>
+            <div className="text-right text-xs text-slate-500">
+              <p className="font-semibold text-slate-700">{catalog.length} catalog symptoms</p>
+              <p>{selected.length} currently selected</p>
+            </div>
+          </div>
         </div>
 
         {error && (
           <div
             role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
+            className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-            <span>{error}</span>
+            <div className="flex-1">
+              <p className="font-semibold text-rose-900">Clinical Validation Notice</p>
+              <p className="mt-0.5 text-rose-800">{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="text-rose-500 hover:text-rose-700"
+              aria-label="Dismiss alert"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 
-        {/* Main 2-Column Workspace */}
-        <div className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:items-start">
-          {/* Left: Searchable Symptom Catalog */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search symptoms or aliases (e.g., fever, chest pain, cough)…"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-teal-600 focus:bg-white focus:ring-3 focus:ring-teal-600/15"
-                />
-              </div>
+        {/* Main 2-Column Clinical Layout */}
+        <div className="grid gap-6 lg:grid-cols-12">
+          {/* Catalog & Search Section */}
+          <section className="space-y-4 lg:col-span-7">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              {/* Search Bar + Red Flag Filter */}
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search symptoms or aliases (e.g., fever, chest pain, cough)…"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-teal-600 focus:bg-white focus:ring-3 focus:ring-teal-600/15"
+                  />
+                </div>
 
-              <button
-                type="button"
-                onClick={() => setRedFlagsOnly((prev) => !prev)}
-                aria-pressed={redFlagsOnly}
-                className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
-                  redFlagsOnly
-                    ? "border-rose-300 bg-rose-50 text-rose-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Red Flags Only
-              </button>
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {categories.map((item) => (
                 <button
-                  key={item}
                   type="button"
-                  onClick={() => setCategory(item)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                    category === item
-                      ? "bg-teal-700 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                  onClick={() => setRedFlagsOnly((prev) => !prev)}
+                  aria-pressed={redFlagsOnly}
+                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition ${
+                    redFlagsOnly
+                      ? "border-rose-300 bg-rose-50 text-rose-800"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                   }`}
                 >
-                  {item.replace(/_/g, " ")}
+                  <AlertTriangle
+                    className={`h-3.5 w-3.5 ${
+                      redFlagsOnly ? "text-rose-600" : "text-slate-400"
+                    }`}
+                  />
+                  Red Flags Only
                 </button>
-              ))}
-            </div>
+              </div>
 
-            {/* Scrollable Symptom Cards */}
-            <div className="mt-5">
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-14 text-slate-500">
-                  <Loader2 className="h-6 w-6 animate-spin text-teal-700" />
-                  <p className="mt-2.5 text-sm">Loading clinical symptom catalog…</p>
-                </div>
-              ) : filteredSymptoms.length === 0 ? (
-                <div className="rounded-xl bg-slate-50 py-12 text-center">
-                  <p className="text-sm font-medium text-slate-700">No matching symptoms found.</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Try clearing your search term or selecting &ldquo;All&rdquo; categories.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid max-h-[580px] gap-2.5 overflow-y-auto pr-1 sm:grid-cols-2">
-                  {filteredSymptoms.map((symptom) => {
-                    const active = selectedIds.has(symptom.id);
-                    return (
-                      <button
-                        key={symptom.id}
-                        type="button"
-                        onClick={() => toggleSymptom(symptom)}
-                        aria-pressed={active}
-                        className={`group rounded-xl border p-3.5 text-left transition ${
-                          active
-                            ? "border-teal-600 bg-teal-50/70 ring-1 ring-teal-600/20"
-                            : "border-slate-200 bg-white hover:border-teal-400 hover:bg-slate-50/70"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-sm font-semibold text-slate-900">
-                            {symptom.name}
-                          </span>
-                          <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs transition ${
-                              active
-                                ? "bg-teal-700 text-white"
-                                : "bg-slate-100 text-slate-500 group-hover:bg-teal-100 group-hover:text-teal-700"
+              {/* Category Filter Pills */}
+              <div className="mt-3.5 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3.5">
+                {categories.map((cat) => {
+                  const active = category === cat;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategory(cat)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                        active
+                          ? "bg-teal-700 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Catalog Items Grid */}
+              <div className="mt-4">
+                {loading ? (
+                  <div className="flex h-56 flex-col items-center justify-center gap-2 text-slate-400">
+                    <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
+                    <p className="text-xs">Loading symptom catalog…</p>
+                  </div>
+                ) : filteredCatalog.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                    <p className="text-sm font-semibold text-slate-700">
+                      No matching symptoms found
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Try clearing filters or searching another clinical term.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
+                    {filteredCatalog.map((item) => {
+                      const isSelected = selectedIds.has(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => toggleSymptom(item)}
+                          className={`group flex cursor-pointer items-start justify-between gap-3 rounded-xl border p-3.5 transition ${
+                            isSelected
+                              ? "border-teal-300 bg-teal-50/70 shadow-xs"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-900">
+                                {item.name}
+                              </span>
+                              {item.is_red_flag && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Red Flag
+                                </span>
+                              )}
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                {item.category}
+                              </span>
+                            </div>
+
+                            {item.aliases.length > 0 && (
+                              <p className="mt-1 text-xs text-slate-500">
+                                Also known as: {item.aliases.slice(0, 3).join(", ")}
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            aria-label={isSelected ? "Deselect" : "Select"}
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition ${
+                              isSelected
+                                ? "border-teal-600 bg-teal-700 text-white"
+                                : "border-slate-300 bg-white text-slate-500 group-hover:border-teal-500 group-hover:text-teal-700"
                             }`}
                           >
-                            {active ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                          </span>
+                            {isSelected ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                          </button>
                         </div>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium capitalize text-slate-600">
-                            {symptom.category.replace(/_/g, " ")}
-                          </span>
-                          {symptom.is_red_flag && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
-                              <AlertTriangle className="h-3 w-3" />
-                              Red Flag
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Right: Sticky Selected Symptoms Panel */}
-          <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-20">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Selected Symptoms</h2>
-                <p className="text-xs text-slate-500">Adjust severity &amp; duration before analysis.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-bold text-teal-800">
-                  {selected.length} / 30
-                </span>
-                {selected.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelected([]);
-                      setError("");
-                    }}
-                    title="Clear all selected symptoms"
-                    className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </div>
+          </section>
+
+          {/* Selected Symptoms & Submission Tray */}
+          <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:col-span-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  Selected Symptoms ({selected.length})
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Configure severity and duration before running analysis.
+                </p>
+              </div>
+
+              {selected.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelected([])}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear All
+                </button>
+              )}
+            </div>
 
             {selected.length === 0 ? (
-              <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center">
-                <HeartPulse className="mx-auto h-7 w-7 text-slate-300" />
-                <p className="mt-2 text-xs font-semibold text-slate-600">No symptoms selected</p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Click any symptom from the catalog on the left to add it to your assessment.
+              <div className="py-12 text-center text-slate-400">
+                <HeartPulse className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm font-semibold text-slate-600">
+                  No symptoms added yet
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Click symptoms from the catalog on the left to include them in this assessment.
                 </p>
               </div>
             ) : (
-              <div className="mt-4 max-h-[380px] space-y-3 overflow-y-auto pr-1">
+              <div className="mt-4 max-h-[460px] space-y-3 overflow-y-auto pr-1">
                 {selected.map((item) => {
-                  const details = catalogById.get(item.symptom_id);
+                  const details = catalogMap.get(item.symptom_id);
                   return (
                     <div
                       key={item.symptom_id}
-                      className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5"
+                      className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5"
                     >
                       <div className="mb-2.5 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
@@ -466,24 +529,29 @@ export function SymptomSelectionPage() {
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyzing Symptoms…
+                  Analyzing &amp; Integrating…
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Analyze &amp; Submit Symptoms
+                  Analyze &amp; Submit Assessment
                 </>
               )}
             </button>
 
             <p className="mt-2.5 text-center text-[11px] text-slate-400">
-              Validates clinical terms, screens red flags &amp; saves to your account.
+              Validates clinical terms, runs correlation analysis, and integrates with your medical history.
             </p>
           </aside>
         </div>
 
-        {/* Live Clinical Analysis Results Panel */}
-        {analysis && submission && (
+        {/* Module 3: Disease Prediction & Clinical Confidence Assessment */}
+        {diseasePrediction && (
+          <DiseasePredictionCard prediction={diseasePrediction} />
+        )}
+
+        {/* Live Clinical Analysis & Medical History Integration Results */}
+        {assessment && (
           <section
             ref={resultsRef}
             className="space-y-5 rounded-2xl border border-teal-200 bg-white p-6 shadow-sm sm:p-7"
@@ -496,26 +564,26 @@ export function SymptomSelectionPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">
-                    Symptom Analysis &amp; Correlation Report
+                    Integrated Symptom Assessment #{assessment.assessment_id}
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Saved as Submission #{submission.submission_id} •{" "}
-                    {analysis.validated_symptoms.length} validated clinical symptom
-                    {analysis.validated_symptoms.length === 1 ? "" : "s"}
+                    Created: {new Date(assessment.created_at).toLocaleString()} •{" "}
+                    {assessment.validated_symptoms.length} validated clinical symptom
+                    {assessment.validated_symptoms.length === 1 ? "" : "s"}
                   </p>
                 </div>
               </div>
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                  COHERENCE_STYLES[analysis.cluster_coherence].badge
+                  COHERENCE_STYLES[assessment.cluster_coherence].badge
                 }`}
               >
-                {COHERENCE_STYLES[analysis.cluster_coherence].label}
+                {COHERENCE_STYLES[assessment.cluster_coherence].label}
               </span>
             </div>
 
             {/* Emergency Red-Flag Banner */}
-            {analysis.has_red_flags && (
+            {assessment.has_red_flags && (
               <div
                 role="alert"
                 className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900"
@@ -528,7 +596,7 @@ export function SymptomSelectionPage() {
                   <p className="mt-1 leading-relaxed text-rose-800">
                     The following reported symptom(s) can indicate an urgent medical condition:{" "}
                     <strong>
-                      {analysis.red_flag_symptoms.map(formatLabel).join(", ")}
+                      {assessment.red_flag_symptoms.map(formatLabel).join(", ")}
                     </strong>
                     . Please seek prompt medical evaluation or call emergency services if symptoms are severe or worsening.
                   </p>
@@ -536,17 +604,58 @@ export function SymptomSelectionPage() {
               </div>
             )}
 
-            {/* Validation Warnings (Contradictions / Clinical Notices) */}
-            {submission.warnings.length > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
-                <p className="font-bold">Clinical Validation Notices</p>
-                <ul className="mt-1.5 list-disc space-y-1 pl-4">
-                  {submission.warnings.map((w, idx) => (
-                    <li key={`${w.code}-${idx}`}>{w.message}</li>
-                  ))}
-                </ul>
+            {/* Medical History Integration Context Card */}
+            <div className="rounded-xl border border-teal-200/80 bg-teal-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-teal-900">
+                  Integrated Patient Medical History Context
+                </span>
+                <Link
+                  to="/medical-history"
+                  className="text-xs font-semibold text-teal-700 hover:underline"
+                >
+                  Update History &rarr;
+                </Link>
               </div>
-            )}
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+                <div className="rounded-lg bg-white p-3 border border-teal-100">
+                  <p className="font-semibold text-slate-500">Blood Group</p>
+                  <p className="mt-1 font-bold text-slate-800">
+                    {assessment.medical_history_context.blood_group || "Not recorded"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-white p-3 border border-teal-100">
+                  <p className="font-semibold text-slate-500">Chronic Conditions</p>
+                  <p className="mt-1 text-slate-800">
+                    {assessment.medical_history_context.chronic_conditions.length > 0
+                      ? assessment.medical_history_context.chronic_conditions.join(", ")
+                      : "None recorded"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-white p-3 border border-teal-100">
+                  <p className="font-semibold text-slate-500">Active Medications</p>
+                  <p className="mt-1 text-slate-800">
+                    {assessment.medical_history_context.current_medications.length > 0
+                      ? assessment.medical_history_context.current_medications
+                          .map((m) => m.name)
+                          .join(", ")
+                      : "None recorded"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-white p-3 border border-teal-100">
+                  <p className="font-semibold text-slate-500">Known Allergies</p>
+                  <p className="mt-1 text-slate-800">
+                    {assessment.medical_history_context.allergies.length > 0
+                      ? assessment.medical_history_context.allergies.join(", ")
+                      : "None recorded"}
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Affected Systems & Disease Categories */}
             <div className="grid gap-4 md:grid-cols-2">
@@ -555,8 +664,8 @@ export function SymptomSelectionPage() {
                   Primary Affected Body Systems
                 </p>
                 <div className="mt-2.5 flex flex-wrap gap-2">
-                  {analysis.primary_affected_systems.length > 0 ? (
-                    analysis.primary_affected_systems.map((sys) => (
+                  {assessment.primary_affected_systems.length > 0 ? (
+                    assessment.primary_affected_systems.map((sys) => (
                       <span
                         key={sys}
                         className="rounded-full border border-teal-200 bg-white px-3 py-1 text-xs font-semibold capitalize text-teal-800"
@@ -575,8 +684,8 @@ export function SymptomSelectionPage() {
                   Potential Clinical Categories
                 </p>
                 <div className="mt-2.5 flex flex-wrap gap-2">
-                  {analysis.potential_disease_categories.length > 0 ? (
-                    analysis.potential_disease_categories.map((cat) => (
+                  {assessment.potential_disease_categories.length > 0 ? (
+                    assessment.potential_disease_categories.map((cat) => (
                       <span
                         key={cat}
                         className="rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-semibold text-cyan-800"
@@ -594,7 +703,7 @@ export function SymptomSelectionPage() {
             </div>
 
             {/* Co-Occurrence Correlations */}
-            {analysis.top_correlated_pairs.length > 0 && (
+            {assessment.top_correlated_pairs.length > 0 && (
               <div>
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-teal-700" />
@@ -603,7 +712,7 @@ export function SymptomSelectionPage() {
                   </h3>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {analysis.top_correlated_pairs.map((pair) => {
+                  {assessment.top_correlated_pairs.map((pair) => {
                     const pct = Math.round(pair.correlation_score * 100);
                     return (
                       <div
@@ -633,7 +742,7 @@ export function SymptomSelectionPage() {
             )}
 
             {/* Suggested Co-Occurring Symptoms */}
-            {analysis.suggested_co_occurring_symptoms.length > 0 && (
+            {assessment.suggested_co_occurring_symptoms.length > 0 && (
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
                   Related Symptoms to Consider
@@ -642,7 +751,7 @@ export function SymptomSelectionPage() {
                   Patients reporting your symptoms frequently also experience the following. Click to add any that apply and re-analyze.
                 </p>
                 <div className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  {analysis.suggested_co_occurring_symptoms.map((suggestion) => {
+                  {assessment.suggested_co_occurring_symptoms.map((suggestion) => {
                     const alreadyAdded = selectedIds.has(suggestion.symptom_id);
                     return (
                       <div
@@ -688,6 +797,95 @@ export function SymptomSelectionPage() {
             )}
           </section>
         )}
+
+        {/* Past Integrated Symptom Assessments History */}
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-2">
+              <History className="h-5 w-5 text-teal-700" />
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  My Symptom Assessment History ({historyList.length})
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Past symptom submissions integrated with your recorded medical history.
+                </p>
+              </div>
+            </div>
+            <span className="text-xs text-slate-400">Newest first</span>
+          </div>
+
+          {loadingHistory ? (
+            <div className="flex items-center justify-center py-8 text-slate-400">
+              <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+              <span className="ml-2 text-xs">Loading past assessments…</span>
+            </div>
+          ) : historyList.length === 0 ? (
+            <p className="mt-4 rounded-xl bg-slate-50 p-6 text-center text-xs text-slate-500">
+              No past symptom assessments found. Submit symptoms above to create your first integrated record.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {historyList.map((item) => (
+                <div
+                  key={item.assessment_id}
+                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">
+                        Assessment #{item.assessment_id}
+                      </span>
+                      <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-teal-800">
+                        Coherence: {item.cluster_coherence}
+                      </span>
+                      {item.has_red_flags && (
+                        <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+                          Red Flags: {item.red_flag_symptoms.join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      {new Date(item.created_at).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {item.validated_symptoms.map((sym) => (
+                      <span
+                        key={sym.symptom_id}
+                        className="rounded-full border border-blue-200 bg-white px-2.5 py-0.5 text-xs font-medium text-blue-800"
+                      >
+                        {sym.name} ({sym.severity}, {sym.duration_days}d)
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 grid gap-2 border-t border-slate-200 pt-2.5 text-xs text-slate-600 sm:grid-cols-2">
+                    <div>
+                      <span className="font-semibold text-slate-800">
+                        Affected Systems:
+                      </span>{" "}
+                      <span className="capitalize">
+                        {item.primary_affected_systems
+                          .join(", ")
+                          .replace(/_/g, " ") || "General"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-800">
+                        Recorded Conditions at Time of Check:
+                      </span>{" "}
+                      {item.medical_history_context.chronic_conditions.length > 0
+                        ? item.medical_history_context.chronic_conditions.join(", ")
+                        : "None"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );
