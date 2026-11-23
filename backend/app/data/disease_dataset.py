@@ -218,6 +218,10 @@ DISEASE_PROFILES: dict[str, DiseaseProfile] = {
     },
 }
 
+# Add standard case variations to match exact Kaggle dataset prognosis labels
+DISEASE_PROFILES["Heart attack"] = DISEASE_PROFILES["Heart Attack"]
+DISEASE_PROFILES["Urinary tract infection"] = DISEASE_PROFILES["Urinary Tract Infection"]
+
 # Master list of all unique symptoms involved across the disease models
 ALL_DISEASE_SYMPTOMS: list[str] = sorted(
     list(

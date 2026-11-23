@@ -3,13 +3,17 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.schemas.disease_prediction import (
+    ComprehensivePredictionResponse,
     DifferentialDiagnosisResponse,
     DiseaseClassificationRequest,
     DiseaseClassificationResponse,
     DiseaseProbabilityResponse,
+    PredictionConfidenceDetails,
 )
 from app.services.disease_ml_service import (
     classify_patient_symptoms,
+    compute_prediction_confidence,
+    predict_comprehensive_assessment,
     predict_differential_diagnoses,
     predict_disease_probabilities,
 )
@@ -86,4 +90,52 @@ def get_differential_diagnosis(payload: DiseaseClassificationRequest) -> Differe
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Differential diagnosis engine error: {exc}",
+        )
+
+
+@router.post(
+    "/confidence",
+    response_model=PredictionConfidenceDetails,
+    status_code=status.HTTP_200_OK,
+    summary="Compute prediction confidence scoring metric and reliability factors",
+    description="Evaluates margin of separation, hallmark coverage, and symptom alignment to provide confidence tiers.",
+)
+def get_prediction_confidence(payload: DiseaseClassificationRequest) -> PredictionConfidenceDetails:
+    if not payload.symptoms:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one symptom must be provided for confidence scoring.",
+        )
+
+    try:
+        result = compute_prediction_confidence(payload.symptoms)
+        return PredictionConfidenceDetails(**result)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Confidence scoring error: {exc}",
+        )
+
+
+@router.post(
+    "/comprehensive",
+    response_model=ComprehensivePredictionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate comprehensive clinical assessment consolidating all 4 Module 3 components",
+    description="Executes classification, probability distributions, differential diagnosis, and confidence scoring in a unified response.",
+)
+def get_comprehensive_prediction(payload: DiseaseClassificationRequest) -> ComprehensivePredictionResponse:
+    if not payload.symptoms:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one symptom must be provided for comprehensive prediction.",
+        )
+
+    try:
+        result = predict_comprehensive_assessment(payload.symptoms)
+        return ComprehensivePredictionResponse(**result)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Comprehensive prediction error: {exc}",
         )

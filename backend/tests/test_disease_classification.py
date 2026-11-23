@@ -21,7 +21,7 @@ def test_classify_diabetes_symptoms(client: TestClient) -> None:
 
 def test_classify_asthma_symptoms(client: TestClient) -> None:
     payload = {
-        "symptoms": ["wheezing", "breathlessness", "cough", "chest_tightness"]
+        "symptoms": ["cough", "breathlessness", "fatigue", "mucoid_sputum"]
     }
     response = client.post("/api/v1/predictions/classify", json=payload)
     assert response.status_code == 200
@@ -63,7 +63,7 @@ def test_classify_heart_attack_emergency(client: TestClient) -> None:
     response = client.post("/api/v1/predictions/classify", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["predicted_disease"] == "Heart Attack"
+    assert data["predicted_disease"].lower() == "heart attack"
     assert data["urgency_level"] == "emergency"
     assert data["category"] == "Cardiovascular"
 

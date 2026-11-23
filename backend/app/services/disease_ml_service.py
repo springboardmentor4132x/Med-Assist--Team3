@@ -6,9 +6,11 @@ trained on standardized Kaggle clinical symptom distributions.
 
 from __future__ import annotations
 
+from pathlib import Path
 import random
 from typing import Any
 
+import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB
@@ -16,6 +18,54 @@ from sklearn.pipeline import Pipeline
 
 from app.data.disease_dataset import ALL_DISEASE_SYMPTOMS, DISEASE_PROFILES, DiseaseProfile
 from app.services.symptom_service import resolve_symptom
+
+ARTIFACTS_DIR = Path(__file__).resolve().parent.parent / "ml" / "artifacts"
+MODEL_FILE = ARTIFACTS_DIR / "disease_model.joblib"
+FEATURES_FILE = ARTIFACTS_DIR / "feature_names.joblib"
+
+# Map clinical terminology and user aliases directly to the Kaggle 132-symptom feature space
+KAGGLE_SYMPTOM_ALIASES: dict[str, str] = {
+    "wheezing": "breathlessness",
+    "shortness_of_breath": "breathlessness",
+    "chest_tightness": "chest_pain",
+    "cold_sweats": "sweating",
+    "cold_sweat": "sweating",
+    "radiating_arm_pain": "chest_pain",
+    "fever": "high_fever",
+    "polydipsia": "polyuria",
+    "unexplained_weight_loss": "weight_loss",
+    "weight_gain": "weight_gain",
+    "unexplained_weight_gain": "weight_gain",
+    "increased_appetite": "excessive_hunger",
+    "cough_with_sputum": "phlegm",
+    "chronic_cough": "cough",
+    "diarrhea": "diarrhoea",
+    "burning_urination": "burning_micturition",
+    "frequent_urination": "polyuria",
+    "joint_stiffness": "movement_stiffness",
+    "limited_joint_movement": "movement_stiffness",
+    "yellowing_of_eyes": "yellowing_of_eyes",
+    "yellowing_of_skin": "yellowish_skin",
+    "acid_reflux": "acidity",
+    "heartburn": "acidity",
+    "throbbing_headache": "headache",
+    "photophobia": "blurred_and_distorted_vision",
+    "visual_aura": "visual_disturbances",
+    "tachycardia": "palpitations",
+    "loss_of_smell": "loss_of_smell",
+    "pelvic_pain": "bladder_discomfort",
+    "dark_urine": "dark_urine",
+}
+
+
+def get_disease_profile(d_name: str) -> DiseaseProfile | None:
+    """Retrieve disease profile handling exact and case-insensitive matches."""
+    if d_name in DISEASE_PROFILES:
+        return DISEASE_PROFILES[d_name]
+    for k, v in DISEASE_PROFILES.items():
+        if k.lower() == d_name.lower():
+            return v
+    return None
 
 
 class DiseaseClassificationResult:
@@ -66,12 +116,26 @@ class DiseaseMLClassifier:
     _instance: DiseaseMLClassifier | None = None
 
     def __init__(self) -> None:
-        self.symptom_to_idx: dict[str, int] = {
-            s: i for i, s in enumerate(ALL_DISEASE_SYMPTOMS)
-        }
+        self.feature_names: list[str] = list(ALL_DISEASE_SYMPTOMS)
         self.classes: list[str] = sorted(list(DISEASE_PROFILES.keys()))
-        self.model: MultinomialNB | None = None
-        self._train_model()
+        self.model: Any = None
+
+        if MODEL_FILE.exists() and FEATURES_FILE.exists():
+            try:
+                self.model = joblib.load(MODEL_FILE)
+                self.feature_names = joblib.load(FEATURES_FILE)
+            except Exception:
+                self.model = None
+
+        self.symptom_to_idx: dict[str, int] = {
+            s: i for i, s in enumerate(self.feature_names)
+        }
+        for s in ALL_DISEASE_SYMPTOMS:
+            if s not in self.symptom_to_idx:
+                self.symptom_to_idx[s] = len(self.feature_names)
+
+        if self.model is None:
+            self._train_model()
 
     @classmethod
     def get_instance(cls) -> DiseaseMLClassifier:
@@ -82,18 +146,23 @@ class DiseaseMLClassifier:
     def normalize_symptom(self, symptom_id: str) -> str:
         """Resolve symptom aliases and standard formatting."""
         cleaned = symptom_id.strip().lower().replace(" ", "_").replace("-", "_")
+        if cleaned in KAGGLE_SYMPTOM_ALIASES:
+            return KAGGLE_SYMPTOM_ALIASES[cleaned]
         meta = resolve_symptom(symptom_id)
         if meta:
-            return meta.id
+            target = meta.id.lower()
+            return KAGGLE_SYMPTOM_ALIASES.get(target, target)
         return cleaned
 
     def encode_symptoms(self, symptoms: list[str]) -> np.ndarray:
         """Convert a list of symptoms into a binary feature vector."""
-        vec = np.zeros(len(ALL_DISEASE_SYMPTOMS), dtype=np.float32)
+        vec = np.zeros(len(self.feature_names), dtype=np.float32)
         for sym in symptoms:
             norm = self.normalize_symptom(sym)
             if norm in self.symptom_to_idx:
-                vec[self.symptom_to_idx[norm]] = 1.0
+                idx = self.symptom_to_idx[norm]
+                if idx < len(self.feature_names):
+                    vec[idx] = 1.0
         return vec
 
     def _generate_synthetic_training_data(
@@ -171,7 +240,7 @@ class DiseaseMLClassifier:
 
         assert self.model is not None
         pred_disease = str(self.model.predict(vec.reshape(1, -1))[0])
-        profile = DISEASE_PROFILES.get(pred_disease)
+        profile = get_disease_profile(pred_disease)
 
         if not profile:
             display_name = pred_disease
@@ -252,7 +321,7 @@ class DiseaseMLClassifier:
         for idx in ranked_indices[:top_n]:
             d_name = str(classes[idx])
             raw_prob = float(probs[idx])
-            profile = DISEASE_PROFILES.get(d_name)
+            profile = get_disease_profile(d_name)
 
             if profile:
                 display_name = profile["name"]
@@ -285,7 +354,11 @@ class DiseaseMLClassifier:
             })
 
         top_pred = probability_items[0]
-        dominant_cat = max(category_counts.items(), key=lambda x: x[1])[0] if category_counts else "General"
+        dominant_cat = (
+            top_pred["category"]
+            if top_pred["category"] != "General"
+            else (max(category_counts.items(), key=lambda x: x[1])[0] if category_counts else "General")
+        )
 
         return {
             "top_prediction": top_pred,
@@ -425,6 +498,9 @@ DIAGNOSTIC_TESTS_MAP: dict[str, list[str]] = {
     ],
 }
 
+DIAGNOSTIC_TESTS_MAP["Heart attack"] = DIAGNOSTIC_TESTS_MAP["Heart Attack"]
+DIAGNOSTIC_TESTS_MAP["Urinary tract infection"] = DIAGNOSTIC_TESTS_MAP["Urinary Tract Infection"]
+
 URGENCY_RANK: dict[str, int] = {
     "emergency": 4,
     "high": 3,
@@ -444,7 +520,7 @@ def predict_differential_diagnoses(symptoms: list[str], top_n: int = 5) -> dict[
 
     for i, item in enumerate(prob_res["probabilities"]):
         d_name = item["disease"]
-        profile = DISEASE_PROFILES.get(d_name)
+        profile = get_disease_profile(d_name)
         urgency = item["urgency_level"]
 
         if URGENCY_RANK.get(urgency, 1) > max_urgency_score:
@@ -509,4 +585,105 @@ def predict_differential_diagnoses(symptoms: list[str], top_n: int = 5) -> dict[
         "highest_urgency": highest_urgency,
         "total_candidates": len(candidates),
         "clinical_triage_guidance": triage_guidance,
+    }
+
+
+def compute_prediction_confidence(symptoms: list[str]) -> dict[str, Any]:
+    """Compute multi-factor prediction confidence score (Module 3 Component 4)."""
+    classifier = DiseaseMLClassifier.get_instance()
+    prob_res = classifier.predict_probabilities(symptoms, top_n=5)
+    candidates = prob_res["probabilities"]
+
+    if not candidates or candidates[0]["disease"] == "Undetermined Non-Specific Presentation":
+        return {
+            "confidence_score": 0.10,
+            "confidence_percent": 10.0,
+            "confidence_level": "Low",
+            "margin_of_separation": 0.0,
+            "symptom_coverage": 0.0,
+            "hallmark_symptoms_present": 0,
+            "ambiguity_flag": True,
+            "clinical_recommendation": (
+                "Low diagnostic confidence: Reported symptoms do not match standardized disease profiles. "
+                "Comprehensive general clinical examination required."
+            ),
+        }
+
+    top_1 = candidates[0]
+    top_2 = candidates[1] if len(candidates) > 1 else None
+
+    p1 = top_1["probability"]
+    p2 = top_2["probability"] if top_2 else 0.0
+    margin = max(0.0, p1 - p2)
+
+    total_symptoms = max(1, len(symptoms))
+    matched_symptoms_count = len(top_1["matched_symptoms"])
+    symptom_coverage = min(1.0, matched_symptoms_count / total_symptoms)
+
+    hallmarks_count = len(top_1["primary_symptoms_matched"])
+    hallmark_factor = 1.0 if hallmarks_count >= 3 else (0.75 if hallmarks_count == 2 else (0.50 if hallmarks_count == 1 else 0.20))
+
+    # Scale relative to 41-class multi-class baseline (where random prior is ~2.44%)
+    scaled_p1 = float(np.clip(p1 * 3.5, 0.0, 1.0))
+    scaled_margin = float(np.clip(margin * 4.0, 0.0, 1.0))
+    raw_confidence = (0.35 * scaled_p1) + (0.25 * scaled_margin) + (0.25 * symptom_coverage) + (0.15 * hallmark_factor)
+    confidence_score = float(np.clip(raw_confidence, 0.05, 0.99))
+    confidence_percent = round(confidence_score * 100.0, 2)
+
+    ambiguity_flag = margin < 0.15
+
+    if confidence_score >= 0.65:
+        confidence_level = "High"
+        recommendation = (
+            f"High diagnostic confidence ({confidence_percent}%): Presentation strongly aligns with {top_1['display_name']} "
+            f"with {hallmarks_count} hallmark symptom(s) confirmed and a decisive margin over alternative differentials."
+        )
+    elif confidence_score >= 0.40:
+        confidence_level = "Moderate"
+        alt_name = top_2['display_name'] if top_2 else 'alternative conditions'
+        recommendation = (
+            f"Moderate diagnostic confidence ({confidence_percent}%): {top_1['display_name']} is the leading candidate, "
+            f"but symptom overlap with {alt_name} warrants confirmatory clinical testing."
+        )
+    else:
+        confidence_level = "Low"
+        recommendation = (
+            f"Low diagnostic confidence ({confidence_percent}%): Diagnostic ambiguity detected. "
+            f"Multiple conditions remain plausible. An expanded history, physical examination, and lab panel are indicated."
+        )
+
+    return {
+        "confidence_score": round(confidence_score, 4),
+        "confidence_percent": confidence_percent,
+        "confidence_level": confidence_level,
+        "margin_of_separation": round(margin, 4),
+        "symptom_coverage": round(symptom_coverage, 4),
+        "hallmark_symptoms_present": hallmarks_count,
+        "ambiguity_flag": ambiguity_flag,
+        "clinical_recommendation": recommendation,
+    }
+
+
+def predict_comprehensive_assessment(symptoms: list[str]) -> dict[str, Any]:
+    """Execute complete Module 3 pipeline consolidating all 4 clinical components."""
+    classifier = DiseaseMLClassifier.get_instance()
+    classification = classifier.classify(symptoms)
+    prob_res = classifier.predict_probabilities(symptoms, top_n=5)
+    diff_res = predict_differential_diagnoses(symptoms, top_n=5)
+    conf_res = compute_prediction_confidence(symptoms)
+
+    summary = (
+        f"Diagnostic evaluation suggests {classification.display_name} as primary candidate "
+        f"({conf_res['confidence_level']} Confidence, {conf_res['confidence_percent']}%). "
+        f"Triage status: {diff_res['highest_urgency'].upper()}. "
+        f"{conf_res['clinical_recommendation']}"
+    )
+
+    return {
+        "classification": classification.to_dict(),
+        "probabilities": prob_res["probabilities"],
+        "differential_diagnoses": diff_res["candidates"],
+        "confidence": conf_res,
+        "triage_urgency": diff_res["highest_urgency"],
+        "clinical_summary": summary,
     }

@@ -17,11 +17,14 @@ import {
   X,
 } from "lucide-react";
 import { AppNavbar } from "../components/AppNavbar";
+import { DiseasePredictionCard } from "../components/DiseasePredictionCard";
 import {
   fetchMySymptomAssessments,
   fetchSymptomsCatalog,
   submitSelectedSymptoms,
 } from "../services/symptoms";
+import { fetchComprehensivePrediction } from "../services/predictions";
+import type { ComprehensivePredictionResponse } from "../types/predictions";
 import type {
   ClusterCoherence,
   IntegratedSymptomAssessmentResponse,
@@ -65,6 +68,8 @@ export function SymptomSelectionPage() {
   const [error, setError] = useState("");
   const [assessment, setAssessment] =
     useState<IntegratedSymptomAssessmentResponse | null>(null);
+  const [diseasePrediction, setDiseasePrediction] =
+    useState<ComprehensivePredictionResponse | null>(null);
 
   const [historyList, setHistoryList] = useState<
     IntegratedSymptomAssessmentResponse[]
@@ -201,9 +206,14 @@ export function SymptomSelectionPage() {
       setSubmitting(true);
       setError("");
 
-      const assessmentRes = await submitSelectedSymptoms(selected);
+      const symptomIds = selected.map((s) => s.symptom_id);
+      const [assessmentRes, predictionRes] = await Promise.all([
+        submitSelectedSymptoms(selected),
+        fetchComprehensivePrediction(symptomIds).catch(() => null),
+      ]);
 
       setAssessment(assessmentRes);
+      setDiseasePrediction(predictionRes);
       setHistoryList((prev) => [assessmentRes, ...prev]);
 
       window.requestAnimationFrame(() => {
@@ -534,6 +544,11 @@ export function SymptomSelectionPage() {
             </p>
           </aside>
         </div>
+
+        {/* Module 3: Disease Prediction & Clinical Confidence Assessment */}
+        {diseasePrediction && (
+          <DiseasePredictionCard prediction={diseasePrediction} />
+        )}
 
         {/* Live Clinical Analysis & Medical History Integration Results */}
         {assessment && (

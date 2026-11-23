@@ -34,7 +34,7 @@ def test_differential_diagnosis_emergency_escalation(client: TestClient) -> None
     data = response.json()
     assert data["highest_urgency"] == "emergency"
     assert "CRITICAL" in data["clinical_triage_guidance"]
-    cardiac_candidate = next((c for c in data["candidates"] if c["disease"] == "Heart Attack"), None)
+    cardiac_candidate = next((c for c in data["candidates"] if c["disease"].lower() == "heart attack"), None)
     assert cardiac_candidate is not None
     assert "12-Lead Serial Electrocardiogram (ECG)" in cardiac_candidate["recommended_diagnostic_tests"]
 

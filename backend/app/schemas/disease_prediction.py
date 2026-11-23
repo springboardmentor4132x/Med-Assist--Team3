@@ -88,3 +88,39 @@ class DifferentialDiagnosisResponse(BaseModel):
     clinical_triage_guidance: str = Field(
         ..., description="Clinical triage advice based on urgency and symptom constellation."
     )
+
+
+class PredictionConfidenceDetails(BaseModel):
+    """Calibrated prediction confidence scoring metric (Module 3 Component 4)."""
+
+    confidence_score: float = Field(..., description="Normalized confidence coefficient between 0.0 and 1.0.")
+    confidence_percent: float = Field(..., description="Confidence expressed as a percentage (0.0% - 100.0%).")
+    confidence_level: str = Field(..., description="Categorical confidence tier: High, Moderate, or Low.")
+    margin_of_separation: float = Field(
+        ..., description="Likelihood difference between primary prediction and nearest differential alternative."
+    )
+    symptom_coverage: float = Field(
+        ..., description="Proportion of patient symptoms directly explained by the primary disease profile."
+    )
+    hallmark_symptoms_present: int = Field(
+        ..., description="Count of primary hallmark symptoms validated in patient presentation."
+    )
+    ambiguity_flag: bool = Field(
+        ..., description="True if top candidate margin is narrow, indicating close competing differentials."
+    )
+    clinical_recommendation: str = Field(
+        ..., description="Evidence-backed clinical workflow recommendation based on confidence tier."
+    )
+
+
+class ComprehensivePredictionResponse(BaseModel):
+    """Unified disease prediction payload consolidating all 4 Module 3 components."""
+
+    classification: DiseaseClassificationResponse = Field(..., description="Component 1: Primary disease classification.")
+    probabilities: list[DiseaseProbabilityItem] = Field(..., description="Component 2: Posterior probability scores.")
+    differential_diagnoses: list[DifferentialCandidate] = Field(
+        ..., description="Component 3: Ranked differential candidates."
+    )
+    confidence: PredictionConfidenceDetails = Field(..., description="Component 4: Prediction confidence scoring.")
+    triage_urgency: str = Field(..., description="Overall triage urgency level.")
+    clinical_summary: str = Field(..., description="Clinical executive summary synthesizing all diagnostic evidence.")
