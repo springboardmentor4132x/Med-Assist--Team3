@@ -27,3 +27,29 @@ class DiseaseClassificationResponse(BaseModel):
     primary_symptoms_matched: list[str] = Field(..., description="Hallmark primary symptoms present in patient profile.")
     total_symptoms_evaluated: int = Field(..., description="Total count of symptoms analyzed.")
     match_ratio: float = Field(..., description="Proportion of patient symptoms aligned with this condition.")
+
+
+class DiseaseProbabilityItem(BaseModel):
+    """Individual disease candidate with calibrated posterior probability score."""
+
+    disease: str = Field(..., description="Machine-readable disease identifier.")
+    display_name: str = Field(..., description="Clinical disease title.")
+    category: str = Field(..., description="Clinical specialty or organ category.")
+    icd10: str = Field(..., description="ICD-10 classification code.")
+    urgency_level: str = Field(..., description="Urgency rating (low, moderate, high, emergency).")
+    probability: float = Field(..., description="Calibrated probability float between 0.0 and 1.0.")
+    probability_percent: float = Field(..., description="Probability expressed as a percentage (0.0% - 100.0%).")
+    matched_symptoms: list[str] = Field(..., description="Patient symptoms that match this disease profile.")
+    primary_symptoms_matched: list[str] = Field(..., description="Key hallmark symptoms present.")
+
+
+class DiseaseProbabilityResponse(BaseModel):
+    """Comprehensive probability distribution response for differential diagnosis scoring."""
+
+    top_prediction: DiseaseProbabilityItem = Field(..., description="Disease candidate with the highest likelihood score.")
+    probabilities: list[DiseaseProbabilityItem] = Field(
+        ..., description="Ranked list of top candidate diseases sorted descending by probability."
+    )
+    total_conditions_evaluated: int = Field(..., description="Total number of clinical conditions evaluated.")
+    evaluated_symptoms: list[str] = Field(..., description="Standardized patient symptoms processed.")
+    dominant_category: str = Field(..., description="Most prevalent medical category among top candidates.")

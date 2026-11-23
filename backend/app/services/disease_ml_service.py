@@ -206,8 +206,103 @@ class DiseaseMLClassifier:
             match_ratio=ratio,
         )
 
+    def predict_probabilities(
+        self, symptoms: list[str], top_n: int = 5
+    ) -> dict[str, Any]:
+        """Generate calibrated probability scores across all candidate diseases (Module 3 Component 2)."""
+        if not symptoms:
+            raise ValueError("At least one symptom must be provided for probability scoring.")
+
+        normalized = [self.normalize_symptom(s) for s in symptoms]
+        vec = self.encode_symptoms(normalized)
+
+        if self.model is None:
+            self._train_model()
+
+        assert self.model is not None
+
+        if np.sum(vec) == 0:
+            fallback_item = {
+                "disease": "Undetermined Non-Specific Presentation",
+                "display_name": "Undetermined / Non-Specific Clinical Presentation",
+                "category": "General",
+                "icd10": "R69",
+                "urgency_level": "low",
+                "probability": 1.0,
+                "probability_percent": 100.0,
+                "matched_symptoms": [],
+                "primary_symptoms_matched": [],
+            }
+            return {
+                "top_prediction": fallback_item,
+                "probabilities": [fallback_item],
+                "total_conditions_evaluated": len(self.classes),
+                "evaluated_symptoms": normalized,
+                "dominant_category": "General",
+            }
+
+        probs = self.model.predict_proba(vec.reshape(1, -1))[0]
+        classes = self.model.classes_
+
+        ranked_indices = np.argsort(probs)[::-1]
+
+        probability_items: list[dict[str, Any]] = []
+        category_counts: dict[str, int] = {}
+
+        for idx in ranked_indices[:top_n]:
+            d_name = str(classes[idx])
+            raw_prob = float(probs[idx])
+            profile = DISEASE_PROFILES.get(d_name)
+
+            if profile:
+                display_name = profile["name"]
+                category = profile["category"]
+                icd10 = profile["icd10"]
+                urgency = profile["urgency_level"]
+                all_known = set(profile["primary_symptoms"] + profile["secondary_symptoms"])
+                matched = [s for s in normalized if s in all_known]
+                matched_p = [s for s in normalized if s in set(profile["primary_symptoms"])]
+            else:
+                display_name = d_name
+                category = "General"
+                icd10 = "R69"
+                urgency = "moderate"
+                matched = []
+                matched_p = []
+
+            category_counts[category] = category_counts.get(category, 0) + 1
+
+            probability_items.append({
+                "disease": d_name,
+                "display_name": display_name,
+                "category": category,
+                "icd10": icd10,
+                "urgency_level": urgency,
+                "probability": round(raw_prob, 4),
+                "probability_percent": round(raw_prob * 100.0, 2),
+                "matched_symptoms": matched,
+                "primary_symptoms_matched": matched_p,
+            })
+
+        top_pred = probability_items[0]
+        dominant_cat = max(category_counts.items(), key=lambda x: x[1])[0] if category_counts else "General"
+
+        return {
+            "top_prediction": top_pred,
+            "probabilities": probability_items,
+            "total_conditions_evaluated": len(classes),
+            "evaluated_symptoms": normalized,
+            "dominant_category": dominant_cat,
+        }
+
 
 def classify_patient_symptoms(symptoms: list[str]) -> DiseaseClassificationResult:
     """Convenience helper to classify symptoms using the singleton classifier."""
     classifier = DiseaseMLClassifier.get_instance()
     return classifier.classify(symptoms)
+
+
+def predict_disease_probabilities(symptoms: list[str], top_n: int = 5) -> dict[str, Any]:
+    """Convenience helper to predict probability distributions across candidate diseases."""
+    classifier = DiseaseMLClassifier.get_instance()
+    return classifier.predict_probabilities(symptoms, top_n=top_n)
