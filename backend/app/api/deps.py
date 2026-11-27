@@ -110,6 +110,32 @@ def get_current_user(
     return session.user
 
 
+def get_current_user_optional(
+    request: Request,
+    token: str | None = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> User | None:
+    """Return the authenticated User if a valid Bearer token is present, otherwise None."""
+    auth_header = request.headers.get("authorization")
+    if not auth_header and not token:
+        return None
+    try:
+        scheme, _, credentials = (auth_header or "").partition(" ")
+        raw_token = token or credentials.strip()
+        if not raw_token:
+            return None
+        decoded = decode_jwt_token(raw_token, expected_type="access", settings=settings)
+        if is_token_revoked(db, decoded.jti):
+            return None
+        user = db.get(User, decoded.sub)
+        if user and user.is_active:
+            return user
+        return None
+    except Exception:
+        return None
+
+
 def require_roles(*allowed_roles: UserRole) -> Callable[[User], User]:
     """Build an RBAC dependency enforcing that `current_user.role` is permitted."""
     allowed_values = {role.value for role in allowed_roles}

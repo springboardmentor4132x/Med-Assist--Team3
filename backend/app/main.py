@@ -11,6 +11,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.protected import router as protected_router
 from app.api.routes.symptoms import router as symptoms_router
 from app.api.routes.disease_prediction import router as predictions_router
+from app.api.routes.emergency import router as emergency_router
 from app.api.routes import medical_history
 
 from app.core.config import Settings, get_settings
@@ -66,6 +67,7 @@ def create_app(
     app.include_router(symptoms_router, prefix="/api/v1")
     app.include_router(medical_history.router, prefix="/api/v1")
     app.include_router(predictions_router, prefix="/api/v1")
+    app.include_router(emergency_router, prefix="/api/v1")
     return app
 
 

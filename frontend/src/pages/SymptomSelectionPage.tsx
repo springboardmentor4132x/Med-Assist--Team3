@@ -18,13 +18,16 @@ import {
 } from "lucide-react";
 import { AppNavbar } from "../components/AppNavbar";
 import { DiseasePredictionCard } from "../components/DiseasePredictionCard";
+import { EmergencyAlertBanner } from "../components/EmergencyAlertBanner";
 import {
   fetchMySymptomAssessments,
   fetchSymptomsCatalog,
   submitSelectedSymptoms,
 } from "../services/symptoms";
 import { fetchComprehensivePrediction } from "../services/predictions";
+import { evaluateEmergencyTriage } from "../services/emergency";
 import type { ComprehensivePredictionResponse } from "../types/predictions";
+import type { EmergencyAssessmentResponse } from "../types/emergency";
 import type {
   ClusterCoherence,
   IntegratedSymptomAssessmentResponse,
@@ -70,6 +73,8 @@ export function SymptomSelectionPage() {
     useState<IntegratedSymptomAssessmentResponse | null>(null);
   const [diseasePrediction, setDiseasePrediction] =
     useState<ComprehensivePredictionResponse | null>(null);
+  const [emergencyAssessment, setEmergencyAssessment] =
+    useState<EmergencyAssessmentResponse | null>(null);
 
   const [historyList, setHistoryList] = useState<
     IntegratedSymptomAssessmentResponse[]
@@ -207,13 +212,15 @@ export function SymptomSelectionPage() {
       setError("");
 
       const symptomIds = selected.map((s) => s.symptom_id);
-      const [assessmentRes, predictionRes] = await Promise.all([
+      const [assessmentRes, predictionRes, emergencyRes] = await Promise.all([
         submitSelectedSymptoms(selected),
         fetchComprehensivePrediction(symptomIds).catch(() => null),
+        evaluateEmergencyTriage({ symptoms: symptomIds }).catch(() => null),
       ]);
 
       setAssessment(assessmentRes);
       setDiseasePrediction(predictionRes);
+      setEmergencyAssessment(emergencyRes);
       setHistoryList((prev) => [assessmentRes, ...prev]);
 
       window.requestAnimationFrame(() => {
@@ -544,6 +551,14 @@ export function SymptomSelectionPage() {
             </p>
           </aside>
         </div>
+
+        {/* Module 4: Emergency Case Identification & Triage Alert Banner */}
+        {emergencyAssessment && (
+          <EmergencyAlertBanner
+            emergency={emergencyAssessment}
+            onDismiss={() => setEmergencyAssessment(null)}
+          />
+        )}
 
         {/* Module 3: Disease Prediction & Clinical Confidence Assessment */}
         {diseasePrediction && (
